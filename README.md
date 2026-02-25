@@ -6,7 +6,7 @@ Security posture management for Claude Code. Native MCP integration gives you co
 
 ```bash
 # Add the marketplace
-/plugin marketplace add spektion/marketplace
+/plugin marketplace add SpektionInc/marketplace
 
 # Install the plugin
 /plugin install spektion
