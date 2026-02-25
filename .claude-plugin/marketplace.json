@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "spektion",
+  "description": "Security posture management — vulnerabilities, assets, runtime detections, and remediation analytics powered by Spektion.",
+  "owner": {
+    "name": "Spektion",
+    "email": "support@spektion.com"
+  },
+  "metadata": {
+    "description": "Spektion security telemetry and analytics for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "spektion",
+      "source": "./plugins/spektion",
+      "strict": true
+    }
+  ]
+}

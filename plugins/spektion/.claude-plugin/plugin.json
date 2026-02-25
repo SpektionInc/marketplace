@@ -1,0 +1,30 @@
+{
+  "name": "spektion",
+  "description": "Security posture management with native MCP tool access — 16 tools for vulnerability, asset, software, detection, and remediation analysis plus 6 guided analyst workflows.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Spektion",
+    "email": "support@spektion.com",
+    "url": "https://spektion.com"
+  },
+  "homepage": "https://spektion.com",
+  "repository": "https://github.com/spektion/marketplace",
+  "license": "Apache-2.0",
+  "keywords": [
+    "security",
+    "vulnerability-management",
+    "asset-inventory",
+    "runtime-detection",
+    "remediation",
+    "cve",
+    "epss",
+    "kev",
+    "software-risk",
+    "network-activity",
+    "sla-compliance",
+    "security-posture",
+    "threat-detection",
+    "spektion",
+    "mcp"
+  ]
+}
