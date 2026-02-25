@@ -1,0 +1,58 @@
+# ── Project ──────────────────────────────────────────
+docs/
+
+# ── Secrets & Credentials ───────────────────────────
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+.api_key
+credentials.json
+secrets.json
+
+# ── AI Coding Assistants ────────────────────────────
+# Claude Code
+.claude/
+CLAUDE.md
+AGENTS.md
+
+# Cursor
+.cursor/
+.cursorrules
+
+# Windsurf
+.windsurf/
+.windsurfrules
+
+# GitHub Copilot
+.copilot/
+.github/copilot-instructions.md
+
+# Others (Aider, Codeium, Continue, Tabnine, Cody, Bolt, Devika)
+.aider*
+.bolt/
+.codeium/
+.cody/
+.continue/
+.devika/
+.tabnine/
+
+# ── Python ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# ── IDE & Editors ───────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── OS ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
