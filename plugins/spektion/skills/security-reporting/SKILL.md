@@ -69,7 +69,7 @@ Call `search_vulnerabilities` with `kev: true`, `sort_by: epss_score`, `limit: 1
 Call `search_software` with `sort_by: cve_count`, `limit: 10`.
 
 **Runtime detections:**
-Call `search_detections` with `highest_impact: critical`, `sort_by: endpoint_count`, `limit: 10`.
+Call `search_detections` with `highest_impact: critical`, `sort_by: highest_impact`, `limit: 10`.
 
 ### Step 4: Synthesize Report
 
@@ -112,7 +112,7 @@ Structure the report based on audience:
 [Top riskiest software by CVE count and detection count]
 
 ## Runtime Detection Activity
-[Critical/high detections, CVE correlation, affected scope]
+[Critical/high detections by category (`runtime_weakness`, `exploit_impact`, `remotely_exploitable`), CVE correlation via `cve_likelihood`, affected scope]
 
 ## Action Items
 [Prioritized list with specific CVEs, software, endpoints to address]
@@ -136,6 +136,6 @@ Include the vulnerability delta from trends data to show if the backlog is growi
 | Get vulnerability trends | `get_vulnerability_trends` | `severity`, `platform`, `start_time`, `end_time` |
 | Search critical CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by`, `limit` |
 | Search risky software | `search_software` | `sort_by: cve_count`, `limit` |
-| Search detections | `search_detections` | `highest_impact`, `sort_by: endpoint_count`, `limit` |
+| Search detections | `search_detections` | `highest_impact`, `sort_by: highest_impact`, `limit` |
 | View SLA policy | Resource: `spektion://sla-policy` | N/A |
 | View platforms | Resource: `spektion://platforms` | N/A |

@@ -70,6 +70,8 @@ From vulnerability trends, review blindspot data:
 
 For blindspot software, call `get_software_details` to assess deployment breadth and business impact.
 
+> **Note:** `get_software_details` groups results by platform. Access software metadata via `items[].software` and per-endpoint data via `items[].assets[]`.
+
 ### Step 6: Produce Status Report
 
 Deliver a structured remediation status:
@@ -90,4 +92,4 @@ Deliver a structured remediation status:
 | Read SLA policy | Resource: `spektion://sla-policy` | N/A |
 | Search high-impact CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by: endpoint_count`, `limit` |
 | Get software details | `get_software_details` | `software_name` (required) |
-| Get tenant settings | `get_tenant_settings` | (none) |
+| Get tenant settings | `get_tenant_settings` | (none) — **not yet implemented**; use `spektion://sla-policy` resource instead |

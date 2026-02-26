@@ -26,8 +26,10 @@ Call `get_endpoint_details` with the `hostname` parameter to retrieve:
 - Business impact tier (`importance`)
 - Online status and last seen timestamp
 - All installed software with grades and versions
-- Network activity (outbound connections, listeners)
+- Network activity (flat list of connections with `is_internal` classification)
 - Software count, risk count, CVE count
+
+> **Note:** The `get_endpoint_details` response can be very large (80KB+) because it includes full `network_activity` and `installed_software` lists. For network analysis, prefer using `search_network_activity` separately rather than relying on the embedded data.
 
 **For endpoint discovery:**
 Call `search_endpoints` with filters:
@@ -42,31 +44,41 @@ For large inventories, use `query_sensors` for paginated results with `offset`.
 ### Step 2: Analyze Installed Software Risk
 
 From the endpoint details, examine `installed_software`:
-1. **Poor grades** (D, F) — software with known vulnerabilities or runtime weaknesses
-2. **High CVE counts** — software contributing the most vulnerability exposure
-3. **Unused software** — installed but not actively used (unnecessary attack surface)
-4. **Missing updates** — check version information for outdated releases
+1. **Poor grades** (D, F) — software with known vulnerabilities or runtime weaknesses. Grade and score are the primary risk indicators.
+2. **Unused software** — installed but not actively used (`used: false`) — unnecessary attack surface
+3. **Missing updates** — check version information for outdated releases
+
+> **Note:** `installed_software` does not include a `cve_count` field. Use grade/score to identify risky software, then call `get_software_details` for specific packages to get full CVE counts.
 
 For the riskiest software, call `get_software_details` with `software_name` to see:
 - Full CVE count and detection count
 - Which other endpoints share this software
 - Risk flags: has_high_risks, has_elevated_risk, has_runtime_weakness, has_remote_exploitability
 
+> **Note:** `get_software_details` groups results by platform. Access software metadata via `items[].software` and per-endpoint data via `items[].assets[]`.
+
 ### Step 3: Map Network Exposure
 
-For software that makes network connections, call `search_network_activity` with `software_name`:
-- **Outbound destinations** — where is software connecting? Check for unexpected external destinations
-- **Observation count** — frequency of connections (high counts = regular behavior, new/low counts = investigate)
-- **Internal vs external** — `is_internal` flag distinguishes LAN from internet traffic
-- **Port bindings** — which software is listening on network ports? These are potential entry points
+For software that makes network connections, call `search_network_activity` with `software_name`. The response has two sections:
+
+**Outbound connections** (`destinations` array):
+- `destination` — where software is connecting. Filter by `is_internal: false` for external connections worth investigating.
+- `activity` — connection type (e.g., `"connection"`)
+- `observation_count` — frequency (high counts = regular behavior, new/low counts = investigate)
+- `is_internal` — distinguishes LAN from internet traffic
+
+**Port bindings** (`listeners` array):
+- `ip_address` and `port` — which software is listening on network ports (potential entry points)
+
+> **Note:** `get_endpoint_details` also includes a `network_activity` flat list, but it only contains outbound connections (no listener data) and can be very large (1000+ entries). Use `search_network_activity` for targeted analysis including listener/port binding data.
 
 ### Step 4: Check Runtime Detections
 
 Call `search_detections` filtered by the endpoint's `platform`:
 - Look for detections with `highest_impact` of critical or high
-- Check categories: "Runtime Weaknesses", "Exploit Impact", "Remotely Exploitable"
-- Cross-reference detection `software_count` and `endpoint_count` to understand if this is isolated or widespread
-- Review `cve_likelihood` to connect behavioral detections to potential CVE exploitation
+- Check categories: `"runtime_weakness"` (insecure configurations), `"exploit_impact"` (exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
+- Review `cve_likelihood` (`probability`: `"high"`, `"medium"`, or `"low"` and `description`) to connect behavioral detections to potential CVE exploitation
+- To assess spread of a specific detection, use `get_software_details` or `search_software` for the associated software to get endpoint and software counts
 
 ### Step 5: Evaluate Business Impact
 

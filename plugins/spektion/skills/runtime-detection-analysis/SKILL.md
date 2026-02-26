@@ -19,9 +19,9 @@ You are a vulnerability analyst investigating runtime behavioral detections usin
 
 Spektion detections are **runtime behavioral observations** — distinct from CVEs. They come from Spektion sensors monitoring software behavior on endpoints. Key concepts:
 
-- **Categories:** Runtime Weaknesses (insecure configs), Exploit Impact (exploitation indicators), Remotely Exploitable (network-accessible attack vectors)
+- **Categories:** `"runtime_weakness"` (insecure configs), `"exploit_impact"` (exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
 - **Impact levels:** critical, high, medium, low — based on potential damage
-- **CVE likelihood:** probability (0-1) and description of how the detection correlates with known CVE exploitation patterns
+- **CVE likelihood:** `probability` is a string (`"high"`, `"medium"`, or `"low"`) with a `description` explaining how the detection correlates with known CVE exploitation patterns
 - **Affected scope:** which software products and endpoints exhibit the behavior
 
 ## Analysis Workflow
@@ -32,7 +32,7 @@ Call `search_detections` to find current behavioral detections:
 - `highest_impact: critical` — start with the most severe detections
 - `platform`: filter to a specific OS if needed
 - `category`: filter by detection type
-- `sort_by: endpoint_count` — find the most widespread detections first
+- `sort_by: highest_impact` — find the most impactful detections first
 - `limit`: up to 100 results
 
 For large datasets, use `query_detection_events` for paginated results with `offset` and `sort`.
@@ -42,9 +42,9 @@ Review the detection rule library for context: read resource `spektion://detecti
 ### Step 2: Analyze CVE Correlation
 
 For each significant detection, examine:
-1. **CVE likelihood probability** — high probability (>0.7) means the behavioral pattern strongly resembles known CVE exploitation
+1. **CVE likelihood probability** — `probability: "high"` means the behavioral pattern strongly resembles known CVE exploitation. Values are `"high"`, `"medium"`, or `"low"` (strings, not numeric).
 2. **CVE likelihood description** — explains which CVE exploitation patterns the behavior matches
-3. **Detection category** — "Exploit Impact" detections are the strongest CVE correlation signals
+3. **Detection category** — `"exploit_impact"` detections are the strongest CVE correlation signals
 
 For detections with high CVE likelihood, call `search_vulnerabilities` to find matching CVEs:
 - Filter by the same `platform`
@@ -53,29 +53,27 @@ For detections with high CVE likelihood, call `search_vulnerabilities` to find m
 
 ### Step 3: Identify Affected Software
 
-From detection results, note `software_count` and `elevated_software_count`:
-- High `software_count` means many products exhibit the behavior (may be an OS-level issue)
-- High `elevated_software_count` means many products have elevated risk from this detection
+From detection results, identify affected software by the detection's `name` and `platform`. The `search_detections` response includes `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, and `first_seen` — but does not include software or endpoint counts directly.
 
-For each affected software product, call `get_software_details` to understand:
+To assess the scope of a detection, call `search_software` or `get_software_details` for the associated software to understand:
 - Deployment breadth (how many endpoints)
 - Business impact tiers of affected endpoints
 - Whether the software also has known CVEs
 - Risk flags (has_high_risks, has_remote_exploitability)
 
+> **Note:** `get_software_details` groups results by platform. Access software metadata via `items[].software` and per-endpoint data via `items[].assets[]`.
+
 ### Step 4: Map Endpoint Impact
 
-From detection results, note `endpoint_count`:
-- High endpoint count = widespread behavior, potentially systemic
-- Low endpoint count = isolated, potentially targeted or anomalous
+To assess endpoint impact, use `search_endpoints` sorted by `risk_count` or `cve_count` to find the highest-risk endpoints on the affected platform. For critical endpoints, call `get_endpoint_details` to understand the full risk context.
 
-Call `search_endpoints` sorted by `risk_count` or `cve_count` to find the highest-risk endpoints in the affected set. For critical endpoints, call `get_endpoint_details` to understand the full risk context.
+> **Note:** `search_detections` does not return endpoint counts directly. Use `search_endpoints` filtered by platform to identify affected endpoints, or use `query_detection_events` which returns `asset_count` and `software_count` per detection.
 
 ### Step 5: Check Network Context
 
-For software associated with "Remotely Exploitable" detections, call `search_network_activity`:
+For software associated with `"remotely_exploitable"` detections, call `search_network_activity`:
 - Are the affected software products making external network connections?
-- Are they binding to network ports (listeners)?
+- Are they binding to network ports (check `search_network_activity` for listener data)?
 - Do network patterns suggest active exploitation (unexpected destinations, high-frequency connections)?
 
 ### Step 6: Produce Threat Narrative
