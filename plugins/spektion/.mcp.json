@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "spektion": {
-      "type": "streamableHttp",
+      "type": "http",
       "url": "${SPEKTION_MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${SPEKTION_API_KEY}"
