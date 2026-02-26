@@ -38,6 +38,9 @@ For large inventories, use `query_software_inventory` for paginated results with
 ### Step 2: Deep-Dive Riskiest Products
 
 For each high-risk software product, call `get_software_details` with `software_name` to see:
+
+> **Note:** `get_software_details` groups results by platform. Access software metadata via `items[].software` and per-endpoint data via `items[].assets[]`.
+
 - **Deployment scope** — which endpoints have it installed, their business impact tiers
 - **Version spread** — how many versions are deployed (version fragmentation = patch gaps)
 - **Usage status** — which endpoints actively use it vs having it installed but unused
@@ -59,8 +62,9 @@ For software that makes network connections (`makes_network_connection: true`), 
 
 Call `search_detections` to find detections associated with the software:
 - Filter by `platform` matching the software's platform
-- Look for detections with high `cve_likelihood` — these indicate the software's behavior patterns resemble CVE exploitation
-- Check categories: "Runtime Weaknesses" (insecure configurations), "Exploit Impact" (observed exploitation indicators), "Remotely Exploitable" (network-accessible attack vectors)
+- Look for detections with high `cve_likelihood` (`probability: "high"`) — these indicate the software's behavior patterns resemble CVE exploitation
+- Check categories: `"runtime_weakness"` (insecure configurations), `"exploit_impact"` (observed exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
+- Note: `search_detections` returns `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, and `first_seen` — use `get_software_details` or `query_detection_events` for endpoint/software counts
 
 ### Step 5: Produce Risk Ranking
 

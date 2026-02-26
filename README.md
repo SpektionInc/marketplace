@@ -43,14 +43,13 @@ Once installed, Claude can directly call these Spektion tools:
 | **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` |
 | **Paginated Queries** | `query_sensors`, `query_software_inventory`, `query_detection_events`, `query_vulnerability_data` |
 
-### 5 Resources
+### 4 Resources
 
 | Resource | Description |
 |----------|-------------|
 | `spektion://platforms` | Active platforms with endpoint counts |
 | `spektion://software-categories` | Software category taxonomy |
 | `spektion://software-publishers` | Publisher list |
-| `spektion://sla-policy` | SLA remediation time matrix |
 | `spektion://detection-rules` | Detection rule library |
 
 ### 6 Analyst Workflow Skills
