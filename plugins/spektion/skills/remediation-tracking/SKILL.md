@@ -45,9 +45,9 @@ Use the same `severity`, `platform`, `start_time`, `end_time` filters for consis
 
 ### Step 3: Evaluate SLA Compliance
 
-Compare remediation metrics against SLA policy:
-1. Read the SLA policy from resource `spektion://sla-policy`
-2. For each severity tier, check if median/mean days are within SLA thresholds
+Use `sla_due_date` from vulnerability data to assess compliance:
+1. Call `search_vulnerabilities` with each severity tier to review `sla_due_date` on open CVEs
+2. For each severity tier, check if median/mean days are within SLA thresholds from `get_remediation_metrics`
 3. Identify severity tiers where P90 exceeds SLA (the long tail of slow remediations)
 4. Check if KEV remediation meets the faster KEV-specific SLA targets
 
@@ -89,7 +89,5 @@ Deliver a structured remediation status:
 |--------|----------|----------------|
 | Get remediation metrics | `get_remediation_metrics` | `severity`, `platform`, `start_time`, `end_time` |
 | Get vulnerability trends | `get_vulnerability_trends` | `severity`, `platform`, `start_time`, `end_time` |
-| Read SLA policy | Resource: `spektion://sla-policy` | N/A |
 | Search high-impact CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by: endpoint_count`, `limit` |
 | Get software details | `get_software_details` | `software_name` (required) |
-| Get tenant settings | `get_tenant_settings` | (none) — **not yet implemented**; use `spektion://sla-policy` resource instead |

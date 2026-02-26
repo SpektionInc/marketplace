@@ -137,5 +137,4 @@ Include the vulnerability delta from trends data to show if the backlog is growi
 | Search critical CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by`, `limit` |
 | Search risky software | `search_software` | `sort_by: cve_count`, `limit` |
 | Search detections | `search_detections` | `highest_impact`, `sort_by: highest_impact`, `limit` |
-| View SLA policy | Resource: `spektion://sla-policy` | N/A |
 | View platforms | Resource: `spektion://platforms` | N/A |
