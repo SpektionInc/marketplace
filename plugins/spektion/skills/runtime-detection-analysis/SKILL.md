@@ -37,8 +37,6 @@ Call `search_detections` to find current behavioral detections:
 
 For large datasets, use `query_detection_events` for paginated results with `offset` and `sort`.
 
-Review the detection rule library for context: read resource `spektion://detection-rules`.
-
 ### Step 2: Analyze CVE Correlation
 
 For each significant detection, examine:
@@ -108,4 +106,3 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 | Get software details | `get_software_details` | `software_name` (required) |
 | Check network activity | `search_network_activity` | `software_name` (required), `limit` |
 | Get endpoint details | `get_endpoint_details` | `hostname` (required) |
-| View detection rules | Resource: `spektion://detection-rules` | N/A |
