@@ -1,7 +1,7 @@
 {
   "name": "spektion",
   "description": "Security posture management with native MCP tool access — 19 tools for vulnerability, asset, software, detection, and remediation analysis plus 6 guided analyst workflows.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "author": {
     "name": "Spektion",
     "email": "support@spektion.com",

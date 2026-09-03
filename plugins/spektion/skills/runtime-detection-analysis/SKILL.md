@@ -43,21 +43,23 @@ For each significant detection, call `get_detection_events` with its `detection_
 
 Use this to answer "show the evidence / events / logs" for a runtime weakness. Never route runtime-weakness evidence requests to `search_ai_security_risks` (that covers the separate AI-security surface).
 
-### Step 3: Analyze CVE Correlation
+### Step 3: Analyze Possible CVE Context
 
 For each significant detection, examine:
 1. **CVE likelihood probability** — `probability: "high"` means the behavioral pattern strongly resembles known CVE exploitation. Values are `"high"`, `"medium"`, or `"low"` (strings, not numeric).
 2. **CVE likelihood description** — explains which CVE exploitation patterns the behavior matches
 3. **Detection category** — `"exploit_impact"` detections are the strongest CVE correlation signals
 
-For detections with high CVE likelihood, call `search_vulnerabilities` to find matching CVEs:
+For detections with high CVE likelihood, call `search_vulnerabilities` to find candidate CVE context:
 - Filter by the same `platform`
 - Look for CVEs affecting the same software products
 - Check `exploit_maturity` and `has_remote_exploitability` to assess if exploitation is feasible
 
+This is a heuristic comparison, not an exact join: neither `search_detections` nor `get_detection_events` returns a CVE ID. Platform or software-name overlap does not prove that an event exploited a particular CVE, affected the same version, or occurred on the same endpoint. Unless another tool or cited source supplies a direct mapping, label the relationship as an unverified hypothesis and do not claim CVE exploitation was observed.
+
 ### Step 4: Identify Affected Software
 
-From the detection results, identify affected software by the detection's `name`, `platform`, and `software_count`. To assess deployment breadth and business impact:
+Take affected software names from `get_detection_events.items[].software_name`; `search_detections.software_count` is only a count and cannot identify products. To assess deployment breadth and business impact:
 - Call `search_software` for the associated software names to see `endpoint_count`, `cve_count`, `detection_count`, and risk flags (`has_high_risks`, `has_runtime_weakness`, `has_remote_exploitability`)
 - Call `get_software_details` for a specific product to see which endpoints have it installed
 
@@ -65,7 +67,9 @@ From the detection results, identify affected software by the detection's `name`
 
 ### Step 5: Map Endpoint Impact
 
-To assess endpoint impact, call `search_assets` sorted by `exposure_score` or `cve_count` to surface the highest-risk assets on the affected platform — each row carries `exposure_score`/`exposure_severity`, `importance`, `enabled`, and a per-asset `risks[]` array. For critical endpoints, call `get_asset_details` to understand the full risk context.
+`search_detections.endpoint_count` gives the affected count but not endpoint identities. `search_assets` has no detection filter and is capped at 100 with no offset, so never treat high-risk assets on the same platform as affected by this detection.
+
+For bounded corroboration, call `search_assets` for the platform and treat an individual asset as detection-affected only when its `risks[]` contains the exact `risk_id`/detection ID under investigation. State that the result is incomplete whenever the asset search is truncated or the fleet can exceed the returned window. Call `get_asset_details` only for an exact hostname already corroborated this way. If exhaustive endpoint identities are requested, report that the current MCP surface provides the count but cannot enumerate the full set.
 
 ### Step 6: Obtain Hardening and Monitoring Guidance
 
@@ -87,11 +91,11 @@ For software associated with `"remotely_exploitable"` detections, call `search_n
 Synthesize findings into an actionable narrative:
 1. **Detection summary** — what behaviors were observed, how severe, how widespread (`endpoint_count`, `software_count`)
 2. **Evidence** — what the event logs show (process paths, modules, API functions, matched outputs)
-3. **CVE correlation** — which detections map to known CVE exploitation patterns
-4. **Affected scope** — which software and endpoints, business impact tiers
+3. **Possible CVE context** — clearly labeled hypotheses based on rule-level likelihood and product/platform overlap; never an asserted CVE-event mapping without direct evidence
+4. **Affected scope** — exact counts from `search_detections`; software identities from evidence; only individually corroborated endpoint identities, with bounded-search limitations disclosed
 5. **Network exposure** — are affected systems network-accessible or making suspicious connections
 6. **Controls** — Spektion's own preventive/detective controls for the weakness (from `get_detection_controls`)
-7. **Risk assessment** — is this active exploitation, precursor activity, or benign behavior?
+7. **Risk assessment** — distinguish verified behavior, inferred possibilities, and unknowns; do not label activity as exploitation without direct evidence
 
 ## External Enrichment (Optional)
 

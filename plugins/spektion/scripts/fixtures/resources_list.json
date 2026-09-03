@@ -14,27 +14,27 @@
         {
           "uri": "spektion://platforms",
           "name": "Active Platforms",
-          "description": "Active platforms in the environment (names, no counts)"
+          "description": "Active Platforms"
         },
         {
           "uri": "spektion://software-categories",
           "name": "Software Categories",
-          "description": "Software category taxonomy with counts"
+          "description": "Software Categories"
         },
         {
           "uri": "spektion://software-publishers",
           "name": "Software Publishers",
-          "description": "Publisher list with software counts"
+          "description": "Software Publishers"
         },
         {
           "uri": "spektion://sla-policy",
           "name": "SLA Remediation Policy",
-          "description": "Tenant SLA remediation time matrix by severity (default matrix when unset)"
+          "description": "SLA Remediation Policy"
         },
         {
           "uri": "spektion://detection-rules",
           "name": "Detection Rule Library",
-          "description": "Detection rule library availability metadata; use search_detections to query rules"
+          "description": "Detection Rule Library"
         }
       ]
     }

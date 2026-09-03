@@ -16,7 +16,7 @@
       "content": [
         {
           "type": "text",
-          "text": "{\"message\": \"tenant settings retrieval will be available in a future update\"}"
+          "text": "{\"sla_matrix\": {\"critical\": 7, \"high\": 14, \"medium\": 30, \"low\": 90}, \"kev_override\": 5, \"default_asset_importance\": \"3\"}"
         }
       ],
       "isError": false

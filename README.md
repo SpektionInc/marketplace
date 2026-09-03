@@ -40,7 +40,7 @@ Once installed, Claude can directly call these Spektion tools:
 |----------|-------|
 | **Search** | `search_vulnerabilities`, `search_assets`, `search_software`, `search_detections`, `search_network_activity`, `search_secrets`, `search_ai_security_risks`, `search_executables`, `search_ai_sessions` |
 | **Details** | `get_vulnerability_details`, `get_asset_details`, `get_software_details`, `get_detection_events`, `get_detection_controls` |
-| **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` |
+| **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` (tenant SLA/settings authority) |
 | **Paginated Queries** | `query_sensors` |
 
 ### 5 Resources
@@ -126,6 +126,8 @@ marketplace/
 │           ├── runtime-detection-analysis/
 │           └── security-reporting/
 ├── scripts/
+│   ├── parity_check.py
+│   ├── test_validation.py
 │   └── validate_plugins.py
 ├── LICENSE
 └── README.md
@@ -133,10 +135,22 @@ marketplace/
 
 ## Development
 
+The pinned contract records the exact `spektionapi` source revision from which
+it was generated. Publish only after credentialed acceptance passes against the
+target MCP deployment; repository parity alone does not prove that revision is
+deployed.
+
 ### Validate
 
 ```bash
 python3 scripts/validate_plugins.py . --verbose
+python3 -m unittest discover -s scripts -p 'test_*.py'
+```
+
+Before release, run credentialed acceptance against the seeded target tenant:
+
+```bash
+python3 plugins/spektion/scripts/contract_smoke.py --live
 ```
 
 Or use the built-in Claude Code validator:

@@ -1,6 +1,11 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "generated_at": "2026-09-03T19:37:38Z",
+  "source": {
+    "repository": "https://github.com/SpektionInc/spektionapi",
+    "revision": "0eb0f636896543df64e1be01ac9acc47366043de",
+    "generator": "cmd/mcp-contract"
+  },
   "mcp": {
     "tools": [
       {
@@ -1289,30 +1294,35 @@
     {
       "uri": "spektion://platforms",
       "name": "Active Platforms",
+      "registration_description": "Active Platforms",
       "description": "Active platforms in the environment (names, no counts)",
       "behavior": "live"
     },
     {
       "uri": "spektion://software-categories",
       "name": "Software Categories",
+      "registration_description": "Software Categories",
       "description": "Software category taxonomy with counts",
       "behavior": "live"
     },
     {
       "uri": "spektion://software-publishers",
       "name": "Software Publishers",
+      "registration_description": "Software Publishers",
       "description": "Publisher list with software counts",
       "behavior": "live"
     },
     {
       "uri": "spektion://sla-policy",
       "name": "SLA Remediation Policy",
+      "registration_description": "SLA Remediation Policy",
       "description": "Tenant SLA remediation time matrix by severity (default matrix when unset)",
       "behavior": "live"
     },
     {
       "uri": "spektion://detection-rules",
       "name": "Detection Rule Library",
+      "registration_description": "Detection Rule Library",
       "description": "Detection rule library availability metadata; use search_detections to query rules",
       "behavior": "instructional"
     }

@@ -6,6 +6,7 @@ contract snapshot exists, delegates to scripts/parity_check.py so the standard
 flow also covers tool-name/param/enum parity with the service contract.
 """
 
+import argparse
 import json
 import os
 import re
@@ -176,12 +177,24 @@ def run_parity_check(root: Path) -> list[str]:
         report = json.loads(proc.stdout)
     except json.JSONDecodeError:
         return [f"parity_check.py produced invalid JSON output: {proc.stdout[:300]}"]
-    return [f"parity: {e}" for e in report.get("errors", [])]
+    errors = [f"parity: {e}" for e in report.get("errors", [])]
+    if not isinstance(report.get("ok"), bool):
+        errors.append("parity: report is missing a boolean 'ok' field")
+    elif report["ok"] != (proc.returncode == 0):
+        errors.append(
+            f"parity: report/exit disagreement (ok={report['ok']}, exit={proc.returncode})")
+    elif proc.returncode != 0 and not errors:
+        errors.append(f"parity: checker exited {proc.returncode} without error details")
+    return errors
 
 
 def main():
-    root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-    verbose = "--verbose" in sys.argv
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", nargs="?", default=".")
+    parser.add_argument("--verbose", action="store_true")
+    args = parser.parse_args()
+    root = Path(args.root)
+    verbose = args.verbose
 
     all_errors = []
     all_errors.extend(validate_marketplace_json(root))

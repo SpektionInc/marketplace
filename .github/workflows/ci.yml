@@ -24,6 +24,9 @@ jobs:
       - name: Deterministic MCP contract smoke (fixtures, no credentials)
         run: python3 plugins/spektion/scripts/contract_smoke.py --fixtures plugins/spektion/scripts/fixtures
 
+      - name: Validation regression tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       - name: Secret scan (no credentials, no external services)
         run: |
           set -euo pipefail

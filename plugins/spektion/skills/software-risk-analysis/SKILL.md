@@ -31,7 +31,7 @@ Call `search_software` with `sort_by: detection_count` to find software triggeri
 Call `search_software` with `sort_by: endpoint_count` to find the most widely deployed software.
 
 **By score:**
-Call `search_software` with `sort_by: score` to find the highest-risk software by Spektion's risk score (higher = riskier).
+Call `search_software` with `sort_by: score` to find the highest-risk software by Spektion's risk score (a higher returned score is riskier).
 
 > **Note:** Grade (A–F) is returned as a field but is NOT a server-side sort or filter. To rank by grade, sort by `cve_count` or `score`, read the `grade` field from each returned row, and render the highest-risk products. Page with `offset` to cover the full set — never make exhaustive claims about the whole portfolio from a single 20-item page.
 
@@ -54,7 +54,7 @@ For each high-risk software product, call `get_software_details` with `software_
 
 ### Step 3: Analyze Network Behavior
 
-For software that makes network connections (`makes_network_connection: true`), call `search_network_activity` with `software_name`:
+For software whose returned `makes_network_connection` field is true, call `search_network_activity` with `software_name`:
 - **External destinations** — `destinations[]` where `is_internal: false` (potential data exfiltration, C2, or legitimate SaaS); each has `destination_value`, `destination_type`, `port`, `activity_type`, `connection_count`, and `is_internal`
 - **Unexpected listeners** — `listeners[]` with `bind_address`, `port`, `activity_type`, and `listener_count` (potential backdoor or unnecessary service)
 - **Connection frequency** — high `connection_count` values indicate regular behavior; new/low counts warrant investigation
