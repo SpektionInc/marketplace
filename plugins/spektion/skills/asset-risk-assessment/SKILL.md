@@ -9,9 +9,9 @@ You are a vulnerability analyst performing endpoint risk assessment using Spekti
 
 ## When to Use
 
-- An endpoint was flagged with a poor security grade and needs investigation
+- An endpoint was flagged with a poor exposure profile and needs investigation
 - You need to understand the full attack surface of a specific host
-- You want to assess risk across a group of endpoints (by platform, online status, or grade)
+- You want to assess risk across a group of endpoints (by platform, online status, or exposure)
 - You need to produce hardening recommendations for a specific asset
 - An incident response requires understanding what software and exposures exist on a host
 
@@ -20,35 +20,35 @@ You are a vulnerability analyst performing endpoint risk assessment using Spekti
 ### Step 1: Identify Target Assets
 
 **For a specific endpoint:**
-Call `get_endpoint_details` with the `hostname` parameter to retrieve:
-- Hostname, IP address, OS, platform, domain
-- Security grade and score
-- Business impact tier (`importance`)
-- Online status and last seen timestamp
-- All installed software with grades and versions
-- Network activity (flat list of connections with `is_internal` classification)
-- Software count, risk count, CVE count
+First call `search_assets` to resolve the exact hostname (case-insensitive), then call `get_asset_details` with the `hostname` parameter to retrieve:
+- Hostname, IP address, OS, platform, domain, endpoint type
+- Exposure score (`exposure_score`, 0–100, higher = more exposed) and severity (`exposure_severity`: CRITICAL/HIGH/MEDIUM/LOW)
+- Business impact tier (`importance`: 1=critical … 5=minimal)
+- Online and enabled status, first/last seen
+- Per-asset runtime risks (`risks[]`: `risk_id`, `risk_name`, `category`, `is_elevated`, `detail_url`)
+- All installed software with grades, scores, and versions
+- Counts: software, unused software, detections, CVEs, network destinations, executables
 
-> **Note:** The `get_endpoint_details` response can be very large (80KB+) because it includes full `network_activity` and `installed_software` lists. For network analysis, prefer using `search_network_activity` separately rather than relying on the embedded data.
+> **Note:** The `get_asset_details` response can be very large because it includes full `installed_software` and `network_activity` lists. Its embedded `network_activity` is a flat list of outbound connections using `destination`, `activity`, and `observation_count`. For listener/port-binding analysis or the richer per-destination fields, use `search_network_activity` instead.
 
 **For endpoint discovery:**
-Call `search_endpoints` with filters:
+Call `search_assets` with filters:
 - `hostname`: substring match to find hosts
 - `platform`: windows, macos, or linux
 - `is_online`: true/false for online status
-- `sort_by`: risk_count, cve_count, score, software_count, last_seen
-- `limit`: up to 100 results
+- `sort_by`: `last_seen`, `cve_count`, `detection_count`, `software_count`, or `exposure_score`
+- `limit` (default and max 100 — results are capped; `total_count` is exact on hostname/platform searches)
 
-For large inventories, use `query_sensors` for paginated results with `offset`.
+For large inventories, use `query_sensors` for paginated sensor results with `sort` (comma-separated, `-` prefix for descending), `limit`, and `offset`.
 
 ### Step 2: Analyze Installed Software Risk
 
-From the endpoint details, examine `installed_software`:
-1. **Poor grades** (D, F) — software with known vulnerabilities or runtime weaknesses. Grade and score are the primary risk indicators.
+From the asset details, examine `installed_software`:
+1. **Poor grades** (D, F) or low scores — software with known vulnerabilities or runtime weaknesses. Grade and score are the primary risk indicators.
 2. **Unused software** — installed but not actively used (`used: false`) — unnecessary attack surface
 3. **Missing updates** — check version information for outdated releases
 
-> **Note:** `installed_software` does not include a `cve_count` field. Use grade/score to identify risky software, then call `get_software_details` for specific packages to get full CVE counts.
+> **Note:** `installed_software` does not include a `cve_count` field. Use grade/score to identify risky software, then call `get_software_details` for specific packages to get full CVE counts and deployment breadth.
 
 For the riskiest software, call `get_software_details` with `software_name` to see:
 - Full CVE count and detection count
@@ -59,32 +59,33 @@ For the riskiest software, call `get_software_details` with `software_name` to s
 
 ### Step 3: Map Network Exposure
 
-For software that makes network connections, call `search_network_activity` with `software_name`. The response has two sections:
+For software that makes network connections, call `search_network_activity` with `software_name` (at least 3 characters). The response has two sections:
 
 **Outbound connections** (`destinations` array):
-- `destination` — where software is connecting. Filter by `is_internal: false` for external connections worth investigating.
-- `activity` — connection type (e.g., `"connection"`)
-- `observation_count` — frequency (high counts = regular behavior, new/low counts = investigate)
+- `destination_value` — where software is connecting (domain or IP). Filter by `is_internal: false` for external connections worth investigating.
+- `destination_type`, `port`, `activity_type` — connection context
+- `connection_count` — frequency (high counts = regular behavior, new/low counts = investigate)
 - `is_internal` — distinguishes LAN from internet traffic
 
 **Port bindings** (`listeners` array):
-- `ip_address` and `port` — which software is listening on network ports (potential entry points)
+- `bind_address` and `port` — which software is listening on network ports (potential entry points)
+- `listener_count` — how often observed
 
-> **Note:** `get_endpoint_details` also includes a `network_activity` flat list, but it only contains outbound connections (no listener data) and can be very large (1000+ entries). Use `search_network_activity` for targeted analysis including listener/port binding data.
+> **Note:** These field names (`destination_value`, `activity_type`, `connection_count`, `bind_address`) belong to `search_network_activity`. The smaller embedded `network_activity` list inside `get_asset_details` still uses `destination`, `activity`, and `observation_count` — do not mix the two schemas.
 
 ### Step 4: Check Runtime Detections
 
-Call `search_detections` filtered by the endpoint's `platform`:
+Call `search_detections` filtered by the endpoint's `platform` or via the asset's `risks[]`:
 - Look for detections with `highest_impact` of critical or high
 - Check categories: `"runtime_weakness"` (insecure configurations), `"exploit_impact"` (exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
 - Review `cve_likelihood` (`probability`: `"high"`, `"medium"`, or `"low"` and `description`) to connect behavioral detections to potential CVE exploitation
-- To assess spread of a specific detection, use `get_software_details` or `search_software` for the associated software to get endpoint and software counts
+- `search_detections` returns `endpoint_count`, `software_count`, and `elevated_software_count` per detection, so assess spread directly; use `offset` to page
 
 ### Step 5: Evaluate Business Impact
 
 Combine findings with the endpoint's business context:
-1. **Importance tier** — from endpoint details, determines remediation urgency
-2. **Grade justification** — explain why the grade is what it is (CVE count, detection count, software risk)
+1. **Importance tier** — from asset details, determines remediation urgency
+2. **Exposure justification** — explain `exposure_severity` and `exposure_score` (CVE count, detection count, software risk, network exposure, runtime risks)
 3. **Attack surface score** — internet-facing services + elevated-privilege software + unpatched CVEs + runtime detections
 4. **Lateral movement risk** — network connections to/from other internal assets
 
@@ -92,10 +93,18 @@ Combine findings with the endpoint's business context:
 
 Deliver a structured assessment:
 1. **Risk summary** — one-paragraph overall risk posture
-2. **Top risk factors** — ranked list of the most significant risks
+2. **Top risk factors** — ranked list of the most significant findings (from the asset's `risks[]` and the analyses above)
 3. **Immediate actions** — patch critical CVEs, restrict risky network connections, remove unused software
 4. **Monitoring recommendations** — detections to watch, network activity to baseline
-5. **Hardening checklist** — OS hardening, software updates, network segmentation
+5. **Hardening** — BEFORE recommending hardening or monitoring controls for any runtime weakness, call `get_detection_controls` with the detection's `detection_id` and report ONLY the Spektion controls it returns:
+   - If `preventive_controls` is empty, say Spektion has no preventive control on file and stop.
+   - If `vendor_fix_only` is true, state that a vendor patch is required — there is no client-side control.
+   - If `detective_control` is null, say Spektion has no detective (Sigma) rule for it.
+   - If `detective_control_error` is set, say the detective control is temporarily unavailable and suggest retrying — do not claim Spektion has none.
+
+**Optional depth (only when they add material value to the assessment):**
+- `search_secrets` — check the host (or the whole fleet) for exposed credentials, API keys, and tokens; follow up with `rule_name`/`severity` filters.
+- `search_executables` — hunt for unsigned or untrusted executables (filter `is_signed: false`); note `detection_count` and per-hash `detections[]` link to runtime weaknesses.
 
 ## External Enrichment (Optional)
 
@@ -110,10 +119,13 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 
 | Action | MCP Tool | Key Parameters |
 |--------|----------|----------------|
-| Get endpoint profile | `get_endpoint_details` | `hostname` (required) |
-| Search endpoints | `search_endpoints` | `hostname`, `platform`, `is_online`, `sort_by`, `limit` |
-| Paginated endpoint query | `query_sensors` | `hostname`, `os_family`, `importance`, `enabled`, `sort`, `limit`, `offset` |
+| Search assets | `search_assets` | `hostname`, `platform`, `is_online`, `sort_by`, `limit` |
+| Get asset profile | `get_asset_details` | `hostname` (required, exact) |
+| Paginated sensor query | `query_sensors` | `hostname`, `os_family`, `importance`, `enabled`, `sort`, `limit`, `offset` |
 | Get software risk profile | `get_software_details` | `software_name` (required) |
 | Check network exposure | `search_network_activity` | `software_name` (required), `limit` |
-| Find runtime detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit` |
+| Find runtime detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit`, `offset` |
+| Get controls for a weakness | `get_detection_controls` | `detection_id` (required) |
+| Find exposed secrets | `search_secrets` | `hostname`, `severity`, `rule_name`, `sort_by`, `limit` |
+| Hunt executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit` |
 | View platform inventory | Resource: `spektion://platforms` | N/A |

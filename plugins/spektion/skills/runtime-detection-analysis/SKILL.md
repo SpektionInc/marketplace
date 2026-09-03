@@ -1,6 +1,6 @@
 ---
 name: runtime-detection-analysis
-description: Investigate runtime behavioral detections from Spektion sensors. Translates behavioral signals into actionable threat narratives by correlating detections with CVEs, affected software, and impacted endpoints.
+description: Investigate runtime behavioral detections from Spektion sensors. Translates behavioral signals into actionable threat narratives by correlating detections with CVEs, affected software, evidence events, and impacted endpoints.
 ---
 
 # Runtime Detection Analysis
@@ -20,9 +20,9 @@ You are a vulnerability analyst investigating runtime behavioral detections usin
 Spektion detections are **runtime behavioral observations** — distinct from CVEs. They come from Spektion sensors monitoring software behavior on endpoints. Key concepts:
 
 - **Categories:** `"runtime_weakness"` (insecure configs), `"exploit_impact"` (exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
-- **Impact levels:** critical, high, medium, low — based on potential damage
-- **CVE likelihood:** `probability` is a string (`"high"`, `"medium"`, or `"low"`) with a `description` explaining how the detection correlates with known CVE exploitation patterns
-- **Affected scope:** which software products and endpoints exhibit the behavior
+- **Impact levels:** `highest_impact` values are lowercase: critical, high, medium, low
+- **CVE likelihood:** `cve_likelihood.probability` is a string (`"high"`, `"medium"`, or `"low"`) with a `description` explaining how the detection correlates with known CVE exploitation patterns
+- **Affected scope:** each detection result carries `endpoint_count`, `software_count`, and `elevated_software_count`
 
 ## Analysis Workflow
 
@@ -31,13 +31,19 @@ Spektion detections are **runtime behavioral observations** — distinct from CV
 Call `search_detections` to find current behavioral detections:
 - `highest_impact: critical` — start with the most severe detections
 - `platform`: filter to a specific OS if needed
-- `category`: filter by detection type
-- `sort_by: highest_impact` — find the most impactful detections first
-- `limit`: up to 100 results
+- `category`: filter by detection type (`runtime_weakness`, `exploit_impact`, `remotely_exploitable`)
+- `sort_by`: `highest_impact`, `endpoint_count`, `software_count`, `first_seen`, or `last_seen`
+- `limit` (default 20, max 100) and `offset` for pagination
 
-For large datasets, use `query_detection_events` for paginated results with `offset` and `sort`.
+Each result includes `id`, `name`, `description`, `highest_impact`, `category`, `subcategory`, `platform`, `endpoint_count`, `software_count`, `elevated_software_count`, `cve_likelihood`, `first_seen`, and `detail_url`. Keep the `id` — you will need it for evidence and controls.
 
-### Step 2: Analyze CVE Correlation
+### Step 2: Pull Evidence Events
+
+For each significant detection, call `get_detection_events` with its `detection_id` (the `id` from `search_detections`; `name` is accepted only when the id is unknown and may return a `candidates` list to disambiguate). The response lists, per affected software product: `software_id`, `software_name`, `first_seen` (event time), `process_path`, `module_name`, `api_function_name` (when present), and `outputs` (the matched evidence parameters).
+
+Use this to answer "show the evidence / events / logs" for a runtime weakness. Never route runtime-weakness evidence requests to `search_ai_security_risks` (that covers the separate AI-security surface).
+
+### Step 3: Analyze CVE Correlation
 
 For each significant detection, examine:
 1. **CVE likelihood probability** — `probability: "high"` means the behavioral pattern strongly resembles known CVE exploitation. Values are `"high"`, `"medium"`, or `"low"` (strings, not numeric).
@@ -49,43 +55,43 @@ For detections with high CVE likelihood, call `search_vulnerabilities` to find m
 - Look for CVEs affecting the same software products
 - Check `exploit_maturity` and `has_remote_exploitability` to assess if exploitation is feasible
 
-### Step 3: Identify Affected Software
+### Step 4: Identify Affected Software
 
-From detection results, identify affected software by the detection's `name` and `platform`. The `search_detections` response includes `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, and `first_seen` — but does not include software or endpoint counts directly.
-
-To assess the scope of a detection, call `search_software` or `get_software_details` for the associated software to understand:
-- Deployment breadth (how many endpoints)
-- Business impact tiers of affected endpoints
-- Whether the software also has known CVEs
-- Risk flags (has_high_risks, has_remote_exploitability)
+From the detection results, identify affected software by the detection's `name`, `platform`, and `software_count`. To assess deployment breadth and business impact:
+- Call `search_software` for the associated software names to see `endpoint_count`, `cve_count`, `detection_count`, and risk flags (`has_high_risks`, `has_runtime_weakness`, `has_remote_exploitability`)
+- Call `get_software_details` for a specific product to see which endpoints have it installed
 
 > **Note:** `get_software_details` groups results by platform. Access software metadata via `items[].software` and per-endpoint data via `items[].assets[]`.
 
-### Step 4: Map Endpoint Impact
+### Step 5: Map Endpoint Impact
 
-To assess endpoint impact, use `search_endpoints` sorted by `risk_count` or `cve_count` to find the highest-risk endpoints on the affected platform. For critical endpoints, call `get_endpoint_details` to understand the full risk context.
+To assess endpoint impact, call `search_assets` sorted by `exposure_score` or `cve_count` to surface the highest-risk assets on the affected platform — each row carries `exposure_score`/`exposure_severity`, `importance`, `enabled`, and a per-asset `risks[]` array. For critical endpoints, call `get_asset_details` to understand the full risk context.
 
-> **Note:** `search_detections` does not return endpoint counts directly. Use `search_endpoints` filtered by platform to identify affected endpoints, or use `query_detection_events` which returns `asset_count` and `software_count` per detection.
+### Step 6: Obtain Hardening and Monitoring Guidance
 
-### Step 5: Check Network Context
+BEFORE recommending hardening or monitoring controls for a runtime weakness, call `get_detection_controls` with the detection's `detection_id` and report ONLY the Spektion controls it returns:
+- `preventive_controls[]` — Spektion hardening guidance (each with `title`, `description`, `effectiveness`, `effort`)
+- `vendor_fix_only` — when true, Spektion has determined there is NO client-side preventive control; remediation requires a vendor patch — report that and do not offer hardening steps as a fix
+- `detective_control` — a Spektion-provided Sigma detection-rule for monitoring (format `sigma`)
+- Edge cases: if `preventive_controls` is empty, say Spektion has no preventive control on file and stop; if `detective_control` is null, say Spektion has none; if `detective_control_error` is set, say the detective control is temporarily unavailable and suggest retrying — never fill the gap with generic hardening or monitoring advice.
+
+### Step 7: Check Network Context
 
 For software associated with `"remotely_exploitable"` detections, call `search_network_activity`:
-- Are the affected software products making external network connections?
-- Are they binding to network ports (check `search_network_activity` for listener data)?
+- Are the affected software products making external network connections? (`destinations[]`: `destination_value`, `destination_type`, `port`, `activity_type`, `is_internal`, `connection_count`)
+- Are they binding to network ports? (`listeners[]`: `bind_address`, `port`, `activity_type`, `listener_count`)
 - Do network patterns suggest active exploitation (unexpected destinations, high-frequency connections)?
 
-### Step 6: Produce Threat Narrative
+### Step 8: Produce Threat Narrative
 
 Synthesize findings into an actionable narrative:
-1. **Detection summary** — what behaviors were observed, how severe, how widespread
-2. **CVE correlation** — which detections map to known CVE exploitation patterns
-3. **Affected scope** — which software and endpoints, business impact tiers
-4. **Network exposure** — are affected systems network-accessible or making suspicious connections
-5. **Risk assessment** — is this active exploitation, precursor activity, or benign behavior?
-6. **Recommended actions:**
-   - **Immediate:** isolate high-risk endpoints, restrict network access
-   - **Short-term:** patch software with correlated CVEs
-   - **Monitoring:** establish baselines for detection frequency
+1. **Detection summary** — what behaviors were observed, how severe, how widespread (`endpoint_count`, `software_count`)
+2. **Evidence** — what the event logs show (process paths, modules, API functions, matched outputs)
+3. **CVE correlation** — which detections map to known CVE exploitation patterns
+4. **Affected scope** — which software and endpoints, business impact tiers
+5. **Network exposure** — are affected systems network-accessible or making suspicious connections
+6. **Controls** — Spektion's own preventive/detective controls for the weakness (from `get_detection_controls`)
+7. **Risk assessment** — is this active exploitation, precursor activity, or benign behavior?
 
 ## External Enrichment (Optional)
 
@@ -100,9 +106,11 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 
 | Action | MCP Tool | Key Parameters |
 |--------|----------|----------------|
-| Search detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit` |
-| Paginated detection query | `query_detection_events` | `category`, `severity`, `platform`, `name`, `sort`, `limit`, `offset` |
-| Search matching CVEs | `search_vulnerabilities` | `severity`, `has_remote_exploitability`, `sort_by`, `limit` |
+| Search detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit`, `offset` |
+| Get detection evidence | `get_detection_events` | `detection_id` (preferred) or `name`, `limit` |
+| Search matching CVEs | `search_vulnerabilities` | `severity`, `platform`, `has_remote_exploitability`, `sort_by`, `limit`, `offset` |
 | Get software details | `get_software_details` | `software_name` (required) |
+| Map endpoint impact | `search_assets` | `platform`, `sort_by` (exposure_score, cve_count), `limit` |
+| Get asset details | `get_asset_details` | `hostname` (required, exact) |
+| Get controls for a weakness | `get_detection_controls` | `detection_id` (required) |
 | Check network activity | `search_network_activity` | `software_name` (required), `limit` |
-| Get endpoint details | `get_endpoint_details` | `hostname` (required) |
