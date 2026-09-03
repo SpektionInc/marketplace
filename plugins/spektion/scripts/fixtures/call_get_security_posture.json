@@ -1,0 +1,25 @@
+{
+  "name": "call_get_security_posture",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "get_security_posture",
+      "arguments": {}
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"total_assets\": 120, \"active_assets\": 100, \"stale_assets\": 15, \"disabled_assets\": 5, \"stale_threshold_days\": 30, \"assets_by_platform\": {\"windows\": 60, \"macos\": 20, \"linux\": 40}, \"total_software\": 300, \"software_by_platform\": {\"windows\": 180, \"macos\": 60, \"linux\": 60}, \"vulnerabilities_by_severity\": {\"critical\": 8, \"high\": 42, \"medium\": 150, \"low\": 300, \"unknown\": 4}, \"total_vulnerabilities\": 504, \"total_detections\": 33, \"org_exposure_score\": 71, \"org_exposure_severity\": \"HIGH\", \"org_exposure_delta\": -2.1}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

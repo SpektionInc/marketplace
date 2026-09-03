@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Validate Spektion marketplace plugin structure and content."""
+"""Validate Spektion marketplace plugin structure and content.
+
+Runs structural checks (manifests, skills, secrets) and, when the pinned MCP
+contract snapshot exists, delegates to scripts/parity_check.py so the standard
+flow also covers tool-name/param/enum parity with the service contract.
+"""
 
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -152,6 +158,27 @@ def check_secrets(root: Path) -> list[str]:
                 errors.append(f"Potential secret file found: {match}")
     return errors
 
+def run_parity_check(root: Path) -> list[str]:
+    """Delegate to scripts/parity_check.py when the pinned contract exists."""
+    contract = root / "plugins" / "spektion" / "contract" / "mcp-contract.json"
+    parity = root / "scripts" / "parity_check.py"
+    if not contract.exists():
+        return []
+    if not parity.exists():
+        return ["Missing scripts/parity_check.py (required when the MCP contract is pinned)"]
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(parity), "--json"],
+            capture_output=True, text=True, check=False)
+    except OSError as e:
+        return [f"parity_check.py could not run: {e}"]
+    try:
+        report = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return [f"parity_check.py produced invalid JSON output: {proc.stdout[:300]}"]
+    return [f"parity: {e}" for e in report.get("errors", [])]
+
+
 def main():
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
     verbose = "--verbose" in sys.argv
@@ -159,6 +186,7 @@ def main():
     all_errors = []
     all_errors.extend(validate_marketplace_json(root))
     all_errors.extend(check_secrets(root))
+    all_errors.extend(run_parity_check(root))
 
     plugins_dir = root / "plugins"
     if not plugins_dir.exists():

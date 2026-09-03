@@ -1,0 +1,25 @@
+{
+  "name": "call_get_remediation_metrics",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "get_remediation_metrics",
+      "arguments": {}
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"median_days_to_remediate\": {\"current\": 21.0, \"previous\": 25.0, \"total_vulns\": 90}, \"mean_days_to_remediate\": {\"current\": 28.5, \"previous\": 31.0, \"total_vulns\": 90}, \"p10_days_to_remediate\": {\"current\": 4.0, \"previous\": 5.5, \"total_vulns\": 90}, \"p90_days_to_remediate\": {\"current\": 62.0, \"previous\": 70.0, \"total_vulns\": 90}, \"kev_mean_days_to_remediate\": {\"current\": 12.0, \"previous\": 15.0, \"total_vulns\": 5}, \"sla_compliance\": [{\"severity\": \"critical\", \"onTrack\": 12, \"overdue\": 3, \"totalVulns\": 15}]}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

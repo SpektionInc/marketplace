@@ -1,0 +1,42 @@
+{
+  "name": "resources_list",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "3",
+    "method": "resources/list",
+    "params": {}
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "3",
+    "result": {
+      "resources": [
+        {
+          "uri": "spektion://platforms",
+          "name": "Active Platforms",
+          "description": "Active platforms in the environment (names, no counts)"
+        },
+        {
+          "uri": "spektion://software-categories",
+          "name": "Software Categories",
+          "description": "Software category taxonomy with counts"
+        },
+        {
+          "uri": "spektion://software-publishers",
+          "name": "Software Publishers",
+          "description": "Publisher list with software counts"
+        },
+        {
+          "uri": "spektion://sla-policy",
+          "name": "SLA Remediation Policy",
+          "description": "Tenant SLA remediation time matrix by severity (default matrix when unset)"
+        },
+        {
+          "uri": "spektion://detection-rules",
+          "name": "Detection Rule Library",
+          "description": "Detection rule library availability metadata; use search_detections to query rules"
+        }
+      ]
+    }
+  }
+}

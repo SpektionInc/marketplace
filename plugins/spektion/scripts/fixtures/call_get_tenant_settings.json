@@ -1,0 +1,25 @@
+{
+  "name": "call_get_tenant_settings",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "get_tenant_settings",
+      "arguments": {}
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"message\": \"tenant settings retrieval will be available in a future update\"}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

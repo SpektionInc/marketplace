@@ -1,0 +1,27 @@
+{
+  "name": "call_search_executables",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "search_executables",
+      "arguments": {
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"items\": [{\"hash\": \"sha256:aa11bb22\", \"filenames\": [\"tool.exe\"], \"asset_count\": 3, \"platform\": \"windows\", \"is_signed\": false, \"is_trusted\": false, \"is_linked_to_software\": true, \"detection_count\": 2, \"detection_categories\": [\"runtime_weakness\"], \"detections\": [{\"name\": \"Weak Crypto\", \"category\": \"runtime_weakness\", \"severity\": \"high\", \"weakness_score\": 62, \"weakness_severity\": \"high\", \"cve_likelihood\": {\"probability\": \"medium\"}, \"detail_url\": \"https://app.spektion.com/risks/DET-00007\"}], \"first_seen\": \"2025-08-01T00:00:00Z\", \"last_seen\": \"2025-09-01T00:00:00Z\", \"detail_url\": \"https://app.spektion.com/executables/aa11bb22\"}], \"total_count\": 1, \"returned\": 1}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}
