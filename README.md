@@ -51,7 +51,7 @@ Once installed, Claude can directly call these Spektion tools:
 | `spektion://software-categories` | Software category taxonomy with per-category software counts |
 | `spektion://software-publishers` | Publisher list with per-publisher software counts |
 | `spektion://detection-rules` | Detection rule availability metadata — query rules with `search_detections` |
-| `spektion://sla-policy` | SLA remediation policy — placeholder (returns a future-update message until tenant settings are wired) |
+| `spektion://sla-policy` | SLA remediation policy — tenant SLA remediation time matrix (default matrix when the tenant has not configured one) |
 
 ### 5 MCP Prompts
 
