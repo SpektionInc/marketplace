@@ -1,6 +1,6 @@
 # Spektion — Claude Code Marketplace Plugin
 
-Security posture management for Claude Code. Native MCP integration gives you conversational access to vulnerability, asset, software, runtime detection, and remediation data from Spektion.
+Security posture management for Claude Code. Native MCP integration gives you conversational access to vulnerability, asset, software, runtime detection, remediation, and security-findings (secrets, AI security) data from Spektion.
 
 ## Quick Start
 
@@ -32,26 +32,38 @@ Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) or your project's `.en
 
 ## What You Get
 
-### 16 MCP Tools (Native Access)
+### 19 MCP Tools (Native Access)
 
 Once installed, Claude can directly call these Spektion tools:
 
 | Category | Tools |
 |----------|-------|
-| **Search** | `search_vulnerabilities`, `search_endpoints`, `search_software`, `search_detections`, `search_network_activity` |
-| **Details** | `get_vulnerability_details`, `get_endpoint_details`, `get_software_details` |
+| **Search** | `search_vulnerabilities`, `search_assets`, `search_software`, `search_detections`, `search_network_activity`, `search_secrets`, `search_ai_security_risks`, `search_executables`, `search_ai_sessions` |
+| **Details** | `get_vulnerability_details`, `get_asset_details`, `get_software_details`, `get_detection_events`, `get_detection_controls` |
 | **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` |
-| **Paginated Queries** | `query_sensors`, `query_software_inventory`, `query_detection_events`, `query_vulnerability_data` |
+| **Paginated Queries** | `query_sensors` |
 
 ### 5 Resources
 
 | Resource | Description |
 |----------|-------------|
-| `spektion://platforms` | Active platforms with endpoint counts |
-| `spektion://software-categories` | Software category taxonomy |
-| `spektion://software-publishers` | Publisher list |
-| `spektion://detection-rules` | Detection rule index (use `search_detections` for queries) |
-| `spektion://sla-policy` | SLA remediation policy (coming soon) |
+| `spektion://platforms` | Active platform names in the environment (platform names only — no counts) |
+| `spektion://software-categories` | Software category taxonomy with per-category software counts |
+| `spektion://software-publishers` | Publisher list with per-publisher software counts |
+| `spektion://detection-rules` | Detection rule availability metadata — query rules with `search_detections` |
+| `spektion://sla-policy` | SLA remediation policy — placeholder (returns a future-update message until tenant settings are wired) |
+
+### 5 MCP Prompts
+
+Prompts are reusable workflows the MCP server exposes; Claude chains the underlying tools to fulfill them:
+
+| Prompt | Arguments | Purpose |
+|--------|-----------|---------|
+| `security_review` | `platform?`, `time_period?` | Full security posture review: posture, critical CVEs, riskiest endpoints, worst-graded software, detection activity, recommendations |
+| `investigate_cve` | `cve_id` (required) | CVE impact investigation: severity, blast radius, business impact, SLA compliance, remediation priority |
+| `endpoint_risk_assessment` | `hostname` (required) | Single-asset assessment: exposure risk, software risks, vulnerability exposure, network analysis, hardening recommendations |
+| `vulnerability_report` | `time_period?`, `severity?` | Vulnerability management report: severity breakdown, remediation metrics, SLA compliance, top CVEs, trends |
+| `software_risk_analysis` | `software_name?`, `grade?` | Software risk prioritization: riskiest products, deployment breadth, unused software, network exposure, blind spots |
 
 ### 6 Analyst Workflow Skills
 
@@ -104,6 +116,8 @@ marketplace/
 │       ├── .claude-plugin/
 │       │   └── plugin.json
 │       ├── .mcp.json
+│       ├── contract/
+│       │   └── mcp-contract.json
 │       └── skills/
 │           ├── cve-triage/
 │           ├── asset-risk-assessment/
