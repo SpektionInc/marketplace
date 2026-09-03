@@ -1,0 +1,1392 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-03T19:07:52Z",
+  "mcp": {
+    "tools": [
+      {
+        "name": "get_asset_details",
+        "description": "Get a single asset's full profile by hostname: the asset summary (same fields as search_assets — exposure score/severity, Business Impact tier, online status, counts, and runtime risks), plus the list of installed software (name, publisher, used/unused, versions, grade, score) and observed network activity (software_name, destination, activity, observation_count, is_internal). Requires an exact hostname (use search_assets first to resolve it).",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "hostname",
+            "type": "string",
+            "required": true
+          }
+        ]
+      },
+      {
+        "name": "get_detection_controls",
+        "description": "Get the Spektion-specific preventative and detective controls associated with a runtime detection (runtime weakness / risk) — the hardening and monitoring guidance shown on the /risks detail page's Controls tabs. Call this BEFORE offering any hardening or monitoring advice for a runtime weakness. Identify the detection by detection_id (the id/risk_id from search_detections or get_detection_events). Returns preventive_controls (each with title, description, effectiveness, effort), vendor_fix_only, detective_control (a Spektion-provided Sigma detection rule), and detective_control_error. Report ONLY what this tool returns; do not supply your own generic hardening or monitoring guidance to fill a gap. When preventive_controls is empty, say Spektion has no preventive control on file and stop. When vendor_fix_only is true (set only when there are no preventive controls), Spektion has determined there is NO client-side preventive control and remediation requires a vendor patch — report that and do not offer hardening steps as a fix. When detective_control is null, Spektion has no detective control for this detection — say so and stop. When detective_control_error is set, the detective control could not be retrieved right now (a temporary failure, not absence) — tell the user it is temporarily unavailable and to try again, and do not claim Spektion has none. Never present anything as a Spektion control that this tool did not return.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "detection_id",
+            "type": "string",
+            "required": true
+          }
+        ]
+      },
+      {
+        "name": "get_detection_events",
+        "description": "Get the evidence logs / events behind a runtime detection (runtime weakness) — the data shown on the /risks detail page's Events tab. This is the correct tool when asked to 'show the evidence', 'show the events', or 'show the logs' for a runtime weakness or risk. Returns, per affected software product: software_name, first_seen (event time), process_path, module_name, api_function_name (when present), and outputs (the matched evidence parameters). Identify the detection by detection_id (the id/risk_id from search_detections, search_assets, or search_software) when you have it; otherwise pass name to resolve by detection name. If the name is ambiguous the tool returns a candidates list so you can retry with a specific detection_id. This is distinct from search_ai_security_risks, which covers the separate /ai-security surface — never route runtime-weakness evidence requests there.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "detection_id",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "get_remediation_metrics",
+        "description": "Get vulnerability remediation performance metrics: mean, median, P10, and P90 days to remediate, plus KEV-specific metrics and SLA compliance data.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "severity",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "platform",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "start_time",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "end_time",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "get_security_posture",
+        "description": "Get a high-level security posture overview from internal analytics routes: total assets, an active/stale/disabled asset breakdown (active = enabled and seen within the last 30 days (seen = any sensor check-in, not proof of live monitoring); stale = enabled but not seen in 30 days; disabled = not enabled, at the sensor level — per-asset scan enablement is a separate state this tool does not report — these three are disjoint and sum to total assets), assets by platform, total canonical software, software by platform, and vulnerability counts by severity. When available it also includes total runtime detections and the organizational exposure headline — org_exposure_score, org_exposure_severity, and org_exposure_delta (change vs the previous period; negative means improving). Use this for 'how is my environment / security posture doing' overview questions before drilling into specific areas.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": []
+      },
+      {
+        "name": "get_software_details",
+        "description": "Get details about specific software products matching a name: a risk summary plus the assets (endpoints) where each is installed. Returns, per matched product, a software summary (name, publisher, platform, score, severity, grade, present versions, CVE/detection counts, risk flags, network activity) and an assets array (hostname, ip_address, importance = Business Impact tier, usage_tracked, used, installed versions). CRITICAL for used/unused questions: usage_tracked=false means usage is not tracked for this product on that asset — usage is UNKNOWN, never report it as unused, and 'used' is omitted; only when usage_tracked=true is 'used' meaningful (true=used, false=genuinely unused). Requires software_name (partial, case-insensitive match; use search_software first to find the exact product). Matches up to 10 products; assets capped at 100 per product.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "software_name",
+            "type": "string",
+            "required": true
+          }
+        ]
+      },
+      {
+        "name": "get_tenant_settings",
+        "description": "Get tenant configuration including SLA remediation policy, asset importance defaults, and KEV override settings.",
+        "read_only": true,
+        "lanes": [
+          "mcp"
+        ],
+        "params": []
+      },
+      {
+        "name": "get_vulnerability_details",
+        "description": "Look up a specific CVE via internal analytics routes. Always returns CVE ID, severity, CVSS score (score), Spektion risk score (risk_score, risk_severity, plus risk_score_min/risk_score_max for the spread across observed instances) when computed, KEV flag, platforms, first_seen, endpoint_count, detail_url, and impacted assets (hostname/platform). score is the industry CVSS rating; risk_score is Spektion's per-tenant runtime risk score — use risk_score (not score) for 'how risky is this CVE in our environment' questions. Also returns sla_due_date and sla_status (overdue, due_today, due_soon, on_track), computed server-side against the tenant SLA matrix and the real current date — use sla_status directly for overdue questions. Optional enriched fields (description, EPSS, exploit status, remote exploitability, is_used, type, CWEs, os_impacted, impacted software, asset importance, cvss_vector — the raw CVSS vector string like 'CVSS:3.1/AV:N/AC:L/...') come from cache and may be missing or stale.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "cve_id",
+            "type": "string",
+            "required": true
+          }
+        ]
+      },
+      {
+        "name": "get_vulnerability_trends",
+        "description": "Get vulnerability trend data: daily delta (new vs resolved), distribution by age and severity, blindspot counts, and preemptive CVE exposure.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "severity",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "platform",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "start_time",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "end_time",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "query_sensors",
+        "description": "Query sensors/endpoints with server-side pagination, sorting, and filtering via ClickHouse. Returns sensor ID, hostname, OS, agent version, importance, grade, and score. Supports large datasets efficiently.",
+        "read_only": true,
+        "lanes": [
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "hostname",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "os_family",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "windows",
+              "macos",
+              "linux"
+            ]
+          },
+          {
+            "name": "importance",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "enabled",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "name": "sort",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "search_ai_security_risks",
+        "description": "Search AI security detections for the /ai-security surface only, paginated and ordered most-recent-first (last 90 days). Results combine runtime sensor detections (source=runtime) with scanner risk findings (source=scan) for AI/agent activity. Filters (hostname, asset_id, severity, rule_name, source) are applied server-side. Returns items plus total_count (total matches before paging), returned (this page's size), and offset — page through large result sets with limit + offset. Each item has event_id, event_time, source, rule_id, rule_name, severity, hostname, platform, asset_id, cvss_v31_score, cvss_v40_score, process_path (when present), matched_params (when present), and detail_url. sort_by=severity reorders the returned page most-severe-first. This is NOT the source for runtime-weakness (/risks) evidence.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "hostname",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "asset_id",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "severity",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          {
+            "name": "rule_name",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "source",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "runtime",
+              "scan"
+            ]
+          },
+          {
+            "name": "sort_by",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "event_time",
+              "severity"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "search_ai_sessions",
+        "description": "Search AI agent session summaries across the customer's environment, paginated and ordered most-recent-first. Returns session_id, hostname, platform, asset_id, agent, classification, severity_max, started_at, duration, is_interim, metric_processes, metric_connections, metric_detections, metric_risk_flags, metric_file_writes, detections (when present; each with id and human-readable name — report the names, not the DET-AI-#### codes), risk_flags (when present), and detail_url, plus total_count (total matches before paging), returned (this page's size), and offset. All metric_* fields are aggregate counts, not itemized data; on the chat surface, get_ai_session_details returns the full metric set for a session (that tool is chat-only, so it is not available over MCP). Filters (hostname, asset_id, agent, classification, severity) are applied server-side. Sort by duration or detection_count. Page through large result sets with limit + offset. Optionally scope the search to a subset of the fleet with asset_tags (operational tags like \"Production\"/\"PCI\", names as the user says them), asset_importance (Business Impact tiers 1=critical … 5=minimal), and/or asset_type (workstation/server) — use these for questions like \"AI sessions on my production-tagged assets\" or \"agent sessions on my critical servers\". They narrow which assets' sessions are returned. A scope that matches no assets is not an error: the response then carries applied_scope alongside an empty list and a message — relay that, do not report it as \"there are no AI sessions\".",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "hostname",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "asset_id",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "agent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "classification",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "severity",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          {
+            "name": "sort_by",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "event_time",
+              "duration",
+              "detection_count"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "asset_tags",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_tags_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_importance",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_importance_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_type",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "workstation",
+              "server"
+            ]
+          },
+          {
+            "name": "asset_type_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "search_assets",
+        "description": "Search assets (systems with a Spektion sensor). Returns hostname, IP, OS, domain, platform (windows/macos/linux), online status, enabled (sensor-level; per-asset scan enablement is a separate state not reported here), exposure score (0-100, higher = more exposed), exposure severity (CRITICAL/HIGH/MEDIUM/LOW), Business Impact tier (importance: 1=critical … 5=minimal, null=unassigned), first/last seen, last logged-on user, software/unused-software/detection/CVE/network-destination/executable counts, and an array of individual runtime risks (each with risk_id, risk_name, category, is_elevated, detail_url). Filter by hostname, platform, or online status; sort by last_seen to surface not-recently-seen assets. For authoritative active/stale/disabled COUNTS use get_security_posture (server-side over the whole fleet) — this list is capped (max 100) and has no enabled filter, so do not tally disabled-vs-stale from it. Result fields depend on the query: on a plain hostname/platform search, total_count is exact and any sort_by ranking is fleet-wide, and truncated=true means only that the returned rows were capped; on an is_online search the filter runs over a bounded window, so total_count can understate the true match count, truncated=true means the returned set may be incomplete, and scanned = rows examined in that window. On an individual returned row the enabled field still distinguishes a disabled asset (enabled=false) from a stale-but-enabled one (enabled=true with an old last_seen; last_seen is any sensor check-in, not proof of live monitoring). Each result has a detail_url — present assets (and their risks) as linked lists. For a single asset's installed software and network activity, use get_asset_details. Scope the whole search to a subset of the fleet with asset_tags (operational tags like \"Production\"/\"PCI\", names as the user says them), asset_importance (Business Impact tiers 1=critical … 5=minimal), and/or asset_type (workstation/server) — use these for questions like \"assets tagged production\" or \"my most critical servers\".",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "hostname",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "platform",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "windows",
+              "macos",
+              "linux"
+            ]
+          },
+          {
+            "name": "is_online",
+            "type": "boolean",
+            "required": false
+          },
+          {
+            "name": "sort_by",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "last_seen",
+              "cve_count",
+              "detection_count",
+              "software_count",
+              "exposure_score"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "asset_tags",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_tags_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_importance",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_importance_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_type",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "workstation",
+              "server"
+            ]
+          },
+          {
+            "name": "asset_type_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "search_detections",
+        "description": "Search runtime detections (risks) in the customer's environment. These are Spektion-unique telemetry, distinct from CVEs. Categories: Runtime Weaknesses (likely to become a CVE), Exploit Impact/Blast Radius (increases exposure if exploited), Remotely Exploitable (binds to sockets/accepts connections). Returns name, impact level, category, subcategory, platform, CVE likelihood, affected asset count, affected software count, and detail_url for direct navigation. Filter by name, category, impact, or platform, and use offset to page through results. Each result includes a detail_url — present detections as a linked list using name and detail_url. Scope the search to a subset of the fleet with asset_tags (operational tags like \"Production\"/\"PCI\", names as the user says them), asset_importance (Business Impact tiers 1=critical … 5=minimal), and/or asset_type (workstation/server) — use these for questions like \"runtime risks on production-tagged assets\". A scope narrows both which detections are listed (a detection present only on out-of-scope assets drops out entirely, rather than appearing with a zero count) AND the two per-asset counts: endpoint_count and software_count then describe the scoped subset, not the fleet. A scope does NOT narrow first_seen. first_seen is recorded per detection with the asset folded out, so it is when the detection was first seen anywhere in the fleet, not on the scoped assets; sort_by=first_seen and sort_by=last_seen therefore order a scoped list by fleet-wide timestamps — present that ordering as \"most recently first detected in the environment\", never \"on these assets\". Still reported under a scope, and unchanged by it: name, category, subcategory, highest_impact, platform, description and cve_likelihood are properties of the detection RULE, identical under any scope, so report them as facts about the detection rather than about the scoped assets. A detection_id from this tool stays valid under a scope, but get_detection_events is always fleet-wide and cannot be scoped, so never present its evidence as coming from the scoped assets. Never describe an unscoped number as scoped. A scope that matches no assets is not an error: the response then carries applied_scope alongside an empty list and a message — relay that message and say nothing matches the requested scope, never \"there are no runtime detections\".",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "runtime_weakness",
+              "exploit_impact",
+              "remotely_exploitable"
+            ]
+          },
+          {
+            "name": "highest_impact",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          {
+            "name": "platform",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "windows",
+              "macos",
+              "linux"
+            ]
+          },
+          {
+            "name": "sort_by",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "endpoint_count",
+              "software_count",
+              "highest_impact",
+              "first_seen",
+              "last_seen"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "asset_tags",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_tags_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_importance",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_importance_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_type",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "workstation",
+              "server"
+            ]
+          },
+          {
+            "name": "asset_type_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "search_executables",
+        "description": "Search observed executables across the customer's environment via ClickHouse. Returns hash, filenames, asset count, platform, signing status (is_signed, is_trusted), whether the executable is linked to canonical software, detection count, first/last seen, and detail_url. Also returns detection_categories (unique list of detection types such as runtime_weakness, exploit_impact, remotely_exploitable) and a detections array with per-detection details: name, category, severity, weakness_score, weakness_severity, and cve_likelihood. Use detection data to assess executable risk — factor weakness severity, detection categories, and CVE likelihood alongside signing status when ranking executables. Filter by platform, signing status, or software linkage. Sort to find most widespread or newest executables. get_executable_details drills into a specific hash for certificate info, paths, and endpoints, but it is exposed on the Ask Shep chat surface only — if it is not in your tool list, do not name it to the user and do not promise per-host detail you cannot fetch. Where it is available, use it ONLY on an unscoped question: its paths and endpoints are always fleet-wide and cannot be scoped, so never present them as the in-scope hosts for a scoped answer. Scope the search to a subset of the fleet with asset_tags (operational tags like \"Production\"/\"PCI\", names as the user says them), asset_importance (Business Impact tiers 1=critical … 5=minimal), and/or asset_type (workstation/server) — use these for questions like \"executables on my critical servers\". A scope narrows WHICH executables are listed (a hash observed only on out-of-scope assets drops out entirely, rather than appearing with a zero count) and asset_count, which then counts only the in-scope assets. Under a scope, detection_count, detection_categories and the detections array are OMITTED from every row rather than returned fleet-wide: detections are recorded against the executable hash with no asset dimension, so this tool has no scoped answer for them. Their absence on a scoped result is expected and is not a sign that the executables are detection-free — if the user needs detection data, say it is only available fleet-wide and offer to re-run the search without the asset scope. filenames, platform, first_seen, last_seen, is_signed, is_trusted and is_linked_to_software are likewise fleet-wide attributes of the hash, aggregated over every asset that ever observed it. Never describe an unscoped number as scoped. A scope that matches no assets is not an error: the response then carries applied_scope alongside an empty list and a message — relay that message and say nothing matches the requested scope, never \"no executables are present\".",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "platform",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "windows",
+              "macos",
+              "linux"
+            ]
+          },
+          {
+            "name": "is_signed",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "name": "is_linked_to_software",
+            "type": "boolean",
+            "required": false
+          },
+          {
+            "name": "sort_by",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "asset_count",
+              "first_seen",
+              "last_seen"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "asset_tags",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_tags_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_importance",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_importance_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_type",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "workstation",
+              "server"
+            ]
+          },
+          {
+            "name": "asset_type_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "search_network_activity",
+        "description": "List the actual outbound network connections (destinations) and inbound port bindings (listeners) observed for a software product — the records behind the software detail page's Network Destinations tab, NOT the aggregate network_destination_count / network_listener_count that search_software reports. This is the right tool whenever the user asks which/what destinations, domains, or IPs a product talks to, or which ports it listens on. Per destination: software_name, hostname (the asset that made the connection), destination_value (the domain or IP), destination_type, port, activity_type, is_internal (true = internal/private destination), and connection_count. Per listener: software_name, hostname, bind_address, port, activity_type, and listener_count. Requires software_name (partial case-insensitive match, at least 3 characters; use search_software first if unsure of the exact name). limit defaults to 50, max 200 — when a list is capped at the limit the response says so. For precise totals use the network_destination_count / network_listener_count fields on search_software.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "software_name",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "search_secrets",
+        "description": "Search secret detections (credentials, API keys, tokens, and other sensitive data) found in the customer's environment by the Spektion scanner. Returns event_id, event_time, rule_id, rule_name, severity, hostname, platform, asset_id, category, subcategory, matched_params (when present), outputs (when present), and detail_url. Filter by hostname, asset_id, severity, or rule_name. Sort by event_time (default) or severity.",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "hostname",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "asset_id",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "severity",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          {
+            "name": "rule_name",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "sort_by",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "event_time",
+              "severity"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "search_software",
+        "description": "Search canonical installed software products across all assets using internal analytics routes (legacy software is excluded). Returns name, publisher, platform, endpoint count, unused endpoint count, present version count, CVE count, detection count, elevated detection count, has_elevated_risk, network activity (network destination/listener counts, makes_network_connection), and detail_url, all from internal analytics. score/severity are the software rollup score (higher = riskier) and its severity label, from a separate best-effort fetch that may be missing. grade, risk flags (has_high_risks, has_runtime_weakness, has_remote_exploitability), exploit_impacts, and the individual runtime risks array are enrichments computed from PostgreSQL category/score data and the risk library; a PostgreSQL enrichment failure fails the call, while risk-library data (risk flags, exploit_impacts, risks) is best-effort and is silently omitted when the library is unavailable. On the storeless MCP lane category/grade come from the tenant software cache, and are omitted if that fetch fails. Filter by name, platform, or category. Use sort_by for ranking questions, and offset to page through results. Use get_software_details to see which specific assets have a product — but ONLY on an unscoped question: get_software_details is always fleet-wide and cannot be scoped, so never pair its asset list with a scoped answer here. IMPORTANT: When the user asks about runtime risks, detections, or weaknesses for software, present individual risks from the risks array as a linked list using detail_url and risk_name. Scope the search to a subset of the fleet with asset_tags (operational tags like \"Production\"/\"PCI\", names as the user says them), asset_importance (Business Impact tiers 1=critical … 5=minimal), and/or asset_type (workstation/server) — use these for questions like \"software installed on production-tagged assets\". A scope narrows both which products are listed (a product present only on out-of-scope assets drops out entirely, rather than appearing with a zero count) AND their per-asset counts: endpoint_count, unused_endpoint_count, present_versions and cve_count then describe the scoped subset, not the fleet. detection_count, elevated_detection_count and has_elevated_risk narrow too, but only by RULE SET — they count the detection rules that apply to the software versions present on the in-scope assets, NOT detections observed on those assets — so say \"N detection rules apply to the versions on these assets\", never \"N detections on these assets\"; and \"elevated\" is a property of a rule observed anywhere in the fleet, so never \"N elevated detections on these assets\" either. A scope does NOT narrow network_destination_count, network_listener_count or makes_network_connection: network activity is recorded per (tenant, software) with no asset dimension, so all three still describe the WHOLE environment even when the row itself is in scope — never report them as the scoped figure, and if asked for network activity within a scope, say it is not available at that granularity. Still reported under a scope, and unchanged by it: score, severity, grade, has_high_risks, has_runtime_weakness, has_remote_exploitability, exploit_impacts and risks are product-level attributes identical under any scope, so report them as facts about the product, not about the scoped assets. Never describe an unscoped number as scoped. A scope that matches no assets is not an error: the response then carries applied_scope alongside an empty list and a message — relay that message and say nothing matches the requested scope, never \"no software is installed\".",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "platform",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "windows",
+              "macos",
+              "linux"
+            ]
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "sort_by",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "cve_count",
+              "endpoint_count",
+              "detection_count",
+              "score"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "asset_tags",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_tags_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_importance",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_importance_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_type",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "workstation",
+              "server"
+            ]
+          },
+          {
+            "name": "asset_type_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "search_vulnerabilities",
+        "description": "Search CVE vulnerabilities across the customer's environment using internal analytics routes. Always returns CVE ID, severity, CVSS score (score), Spektion risk score (risk_score) and risk_severity when computed, KEV flag, platforms, first_seen, affected asset count, and detail_url. score is the industry CVSS rating; risk_score is Spektion's per-tenant runtime risk score and is the right field for 'riskiest CVE in our environment' questions. Additional fields (EPSS score, exploit status, remote exploitability, is_used, published date, ransomware association, title) come from the analytics enriched response and may be missing. sla_due_date and sla_status (overdue, due_today, due_soon, on_track) are computed server-side against the tenant SLA matrix and the real current date — for 'past SLA / overdue' questions use sla_status directly rather than comparing dates yourself. Filter by name (CVE ID substring), severity, KEV, platform, exploit_maturity, has_remote_exploitability, and is_used — all applied server-side over the whole environment (or over the whole asset scope, when one is set), so compound filters (e.g. used AND remotely exploitable AND actively exploited) return the exact matching set, not a sample. Sort to answer questions like 'which CVEs are actively used' or 'which CVEs are remotely exploitable'. For 'newest' CVE questions use published (when available); for most recently observed in this environment use first_seen. Use offset to page through results. Use get_vulnerability_details to see full details and impacted assets for a specific CVE — but ONLY on an unscoped question: get_vulnerability_details is always fleet-wide and cannot be scoped, so its endpoint_count and impacted-asset list will disagree with a scoped answer here and must never be presented as the in-scope hosts. Scope the search to a subset of the fleet with asset_tags (operational tags like \"Production\"/\"PCI\", names as the user says them), asset_importance (Business Impact tiers 1=critical … 5=minimal), and/or asset_type (workstation/server) — use these for questions like \"open CVEs on assets tagged production\". The scope narrows by ASSET, and severity, kev, exploit_maturity, has_remote_exploitability and is_used still select the CVE — different grains, so keep them apart. A scope changes which CVEs are listed (a CVE open only on out-of-scope assets drops out entirely, rather than appearing with a zero count) AND every per-asset figure on the row: endpoint_count, first_seen, platforms, is_used, has_remote_exploitability, risk_score, risk_severity, sla_due_date and sla_status are then computed over the in-scope assets only, and total_count is the scoped match count. So \"critical CVEs on production-tagged assets\" means CVEs whose own severity is critical AND that are open on at least one in-scope asset. Still reported under a scope, and unchanged by it: cve_id, name, severity, score, epss_score, exploit_maturity, kev, kev_ransomware_campaign_use and published are properties of the CVE in the public catalog, identical under any scope — report them as facts about the CVE, never as findings about the scoped assets. detail_url likewise opens the fleet-wide CVE page, which does not carry the asset scope. Never describe an unscoped number as scoped. A scope that matches no assets is not an error: the response then carries applied_scope alongside an empty list and a message — relay that message and say nothing matches the requested scope, never \"no vulnerabilities exist\".",
+        "read_only": true,
+        "lanes": [
+          "chat",
+          "mcp"
+        ],
+        "params": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "severity",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          {
+            "name": "kev",
+            "type": "boolean",
+            "required": false
+          },
+          {
+            "name": "exploit_maturity",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "actively exploited",
+              "weaponized poc",
+              "proof of concept",
+              "no known exploit",
+              "wild",
+              "poc-weaponized",
+              "poc",
+              "none"
+            ]
+          },
+          {
+            "name": "has_remote_exploitability",
+            "type": "boolean",
+            "required": false
+          },
+          {
+            "name": "is_used",
+            "type": "boolean",
+            "required": false
+          },
+          {
+            "name": "platform",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "windows",
+              "macos",
+              "linux"
+            ]
+          },
+          {
+            "name": "sort_by",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "score",
+              "epss_score",
+              "endpoint_count",
+              "published",
+              "first_seen"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "required": false
+          },
+          {
+            "name": "asset_tags",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_tags_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_importance",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "asset_importance_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          },
+          {
+            "name": "asset_type",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "workstation",
+              "server"
+            ]
+          },
+          {
+            "name": "asset_type_op",
+            "type": "string",
+            "required": false,
+            "enum": [
+              "equals",
+              "notEqual"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "chat_only_tools": [
+    {
+      "name": "get_ai_session_details",
+      "description": "Get full details for a specific AI agent session by session ID. Returns all summary fields plus actor identity (name, uid, is_elevated, is_service, git_email, tool_account_type, tool_subscription), extended metrics (shells, compilers, bytes_sent, bytes_recv, file_reads, file_deletes, file_renames, perm_changes, files_outside, mcp_servers, config_mutations, package_ops, ecosystem_components), domain arrays (novel_domains, unique_domains), cowork fields (vm_process, folders, egress_domains, tools, has_browser_control, has_computer_use, perm_requests, perm_denials, cost, urls), and session context (directory, signing_id, team_id, parent_session_id, agent_path). IMPORTANT: the metric_* fields are aggregate COUNTS for the activity classes they measure, not itemized data. The record itself is richer than counts — it also carries real values (actor identity, classification, severity, context), the fired detections (each with id and human-readable name — report the names, not the DET-AI-#### codes), and itemized string arrays (risk_flags, novel_domains, unique_domains, and for cowork sessions folders, egress_domains, tools, urls) — report those directly. But the per-item detail behind the counts is not available in this record: no file paths (only file read/write/delete/rename counts), no shell command lines (only a shells count), no package names (only a package_ops count), no per-MCP-server names (only an mcp_servers count), and no connection tuples/IPs/ports (only a connections count plus bytes sent/received). The response includes a data_notes field restating this; when asked for per-item detail that is not present, state that it is not available here instead of inferring or fabricating it. Requires session_id (use search_ai_sessions first).",
+      "read_only": true,
+      "lanes": [
+        "chat"
+      ],
+      "params": [
+        {
+          "name": "session_id",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "get_asset_executables",
+      "description": "List executables observed on a specific asset by hostname. Returns hash, filenames, platform, signing status (is_signed, is_trusted), and detail_url for each executable. Requires hostname (use search_assets first to find it). Use this to answer questions like 'what is running on this host' or 'show me unsigned executables on SERVER01'.",
+      "read_only": true,
+      "lanes": [
+        "chat"
+      ],
+      "params": [
+        {
+          "name": "hostname",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "get_asset_software",
+      "description": "List software installed on a specific asset. Returns software name, publisher, used/unused status, installed versions, grade (A-F), score, and install date. Requires hostname (use search_assets first to find it). The used field is true (used), false (unused), or omitted when usage is not tracked for that software (unknown — do not treat as unused).",
+      "read_only": true,
+      "lanes": [
+        "chat"
+      ],
+      "params": [
+        {
+          "name": "hostname",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "get_executable_details",
+      "description": "Get detailed information about a specific executable by hash. Returns the executable summary (filenames, signing/trust status, platform, asset count, detection count) plus observed file paths with full code-signing certificate details (subject, issuer, fingerprint, validity dates, self-signed flag), associated runtime detections (name, category, severity, asset count), and endpoints where the executable is present (hostname, importance tier). Requires the executable hash (use search_executables first to find it).",
+      "read_only": true,
+      "lanes": [
+        "chat"
+      ],
+      "params": [
+        {
+          "name": "hash",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "get_org_exposure",
+      "description": "Get the organizational exposure score — an aggregate measure of the customer's overall security posture. Returns the org-wide exposure score (0-100, higher = more exposed), severity (CRITICAL/HIGH/MEDIUM/LOW/INFORMATIONAL — INFORMATIONAL means a score of 0), risk concentration and breadth metrics, delta (change from previous period — negative means improving; present on UNSCOPED calls only), the count of assets that have a computed exposure score (a subset of the fleet, NOT the total inventory — use get_security_posture for that, but ONLY on an unscoped question: get_security_posture is always fleet-wide and cannot be scoped, so never pair its totals with a scoped answer here), and the top 20 riskiest assets ranked by business-impact-weighted exposure score (so a lower-tier asset with a high raw score can rank below a critical-tier asset with a lower score, and the returned exposure_score column is not monotonic). Each top asset includes hostname, platform, business impact tier, exposure score, CVE count, and runtime risk count. Use this for questions about overall posture, risk trends, or identifying the riskiest assets. Optionally scope the whole calculation to a subset of the fleet with asset_tags (operational tags like \"Production\"/\"PCI\", names as the user says them), asset_importance (Business Impact tiers 1=critical … 5=minimal), and/or asset_type (workstation/server). These do NOT just filter the top-asset list — they change the fleet EVERY number here is computed over (score, severity, concentration, breadth, asset count), so a scoped answer is that subset's exposure, not the organization's: say which scope was applied (applied_scope echoes it) and omit these params entirely when the user wants the org-wide headline number. Under a scope, delta is OMITTED entirely because no scoped history is kept: a scoped answer carries no trend at all, so never state or infer one — not even \"unchanged\" or \"flat\". A scope that matches no assets is not an error: the response then OMITS the score and every other posture field and carries a message instead — relay that message and say nothing matches the scope. Never state or infer an exposure score for a scope the response gave none for.",
+      "read_only": true,
+      "lanes": [
+        "chat"
+      ],
+      "params": [
+        {
+          "name": "asset_tags",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "asset_tags_op",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "equals",
+            "notEqual"
+          ]
+        },
+        {
+          "name": "asset_importance",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "asset_importance_op",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "equals",
+            "notEqual"
+          ]
+        },
+        {
+          "name": "asset_type",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "workstation",
+            "server"
+          ]
+        },
+        {
+          "name": "asset_type_op",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "equals",
+            "notEqual"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "search_ai_inventory",
+      "description": "Search AI/ML products (coding assistants, chat tools, agents, frameworks) installed in the customer's environment. Returns name, publisher, platform, score, severity, endpoint_count, cve_count, detection_count, and more, scoped to software classified under the \"Artificial Intelligence and Machine Learning\" category. Filter by name or platform; sort by cve_count, detection_count, score, or endpoint_count.",
+      "read_only": true,
+      "lanes": [
+        "chat"
+      ],
+      "params": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "platform",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "windows",
+            "macos",
+            "linux"
+          ]
+        },
+        {
+          "name": "sort_by",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "endpoint_count",
+            "cve_count",
+            "detection_count",
+            "score"
+          ]
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "search_extensions",
+      "description": "Search browser extension detections found in the customer's environment by the Spektion scanner. Returns event_id, event_time, rule_id, rule_name, severity, hostname, platform, asset_id, category, subcategory, matched_params (when present), outputs (when present), and detail_url. Filter by hostname, asset_id, category, severity, or rule_name. Sort by severity.",
+      "read_only": true,
+      "lanes": [
+        "chat"
+      ],
+      "params": [
+        {
+          "name": "hostname",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "asset_id",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "category",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "inventory",
+            "risk"
+          ]
+        },
+        {
+          "name": "severity",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        {
+          "name": "rule_name",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "sort_by",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "severity"
+          ]
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "search_software_cve_risks",
+      "description": "Find canonical software with runtime risks classified as preemptive or blind_spot. preemptive means runtime-risk software with one or more CVEs; blind_spot means runtime-risk software with zero CVEs (the org has no CVE visibility into it despite runtime exposure). Every result includes name, platform, score, CVE counts by severity, highest CVSS score, and endpoint count. blind_spot results additionally carry exploitability signals — has_remote_exploitability, has_elevated_risk, detection_count, elevated_detection_count, network_listener_count, network_connection_count — so you can answer which blind spots are most exploitable. To rank by exploitability use sort_by=exploitability; to only see remotely-exploitable blind spots set remotely_exploitable=true.",
+      "read_only": true,
+      "lanes": [
+        "chat"
+      ],
+      "params": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "preemptive",
+            "blind_spot"
+          ]
+        },
+        {
+          "name": "platform",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "windows",
+            "macos",
+            "linux"
+          ]
+        },
+        {
+          "name": "sort_by",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "total_cve_count",
+            "highest_cvss_score",
+            "endpoint_count",
+            "exploitability"
+          ]
+        },
+        {
+          "name": "remotely_exploitable",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "uri": "spektion://platforms",
+      "name": "Active Platforms",
+      "description": "Active platforms in the environment",
+      "behavior": "live"
+    },
+    {
+      "uri": "spektion://software-categories",
+      "name": "Software Categories",
+      "description": "Software category taxonomy with counts",
+      "behavior": "live"
+    },
+    {
+      "uri": "spektion://software-publishers",
+      "name": "Software Publishers",
+      "description": "Publisher list with software counts",
+      "behavior": "live"
+    },
+    {
+      "uri": "spektion://sla-policy",
+      "name": "SLA Remediation Policy",
+      "description": "Tenant SLA remediation time matrix by severity",
+      "behavior": "placeholder"
+    },
+    {
+      "uri": "spektion://detection-rules",
+      "name": "Detection Rule Library",
+      "description": "Detection rule library with rule names and categories",
+      "behavior": "instructional"
+    }
+  ],
+  "prompts": [
+    {
+      "name": "security_review",
+      "description": "Comprehensive security posture review",
+      "args": [
+        {
+          "name": "platform",
+          "description": "Platform to focus on (windows, macos, linux)",
+          "required": false
+        },
+        {
+          "name": "time_period",
+          "description": "Time period for the review (e.g. 7d, 30d, 90d)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "investigate_cve",
+      "description": "CVE impact investigation workflow",
+      "args": [
+        {
+          "name": "cve_id",
+          "description": "The CVE identifier to investigate (e.g. CVE-2024-1234)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "endpoint_risk_assessment",
+      "description": "Single-endpoint security assessment",
+      "args": [
+        {
+          "name": "hostname",
+          "description": "The hostname of the endpoint to assess",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "vulnerability_report",
+      "description": "Vulnerability management report with metrics",
+      "args": [
+        {
+          "name": "time_period",
+          "description": "Reporting period (e.g. 7d, 30d, 90d)",
+          "required": false
+        },
+        {
+          "name": "severity",
+          "description": "Severity filter (critical, high, medium, low)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "software_risk_analysis",
+      "description": "Software risk prioritization analysis",
+      "args": [
+        {
+          "name": "software_name",
+          "description": "Name of the software to analyze",
+          "required": false
+        },
+        {
+          "name": "grade",
+          "description": "Software grade filter",
+          "required": false
+        }
+      ]
+    }
+  ]
+}
