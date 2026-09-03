@@ -1,6 +1,7 @@
 # ── Project ──────────────────────────────────────────
-docs/
-plugins/spektion/scripts/
+# Root planning docs are intentionally private; only the root plans dir is ignored
+# (the previous broad docs/ rule silently excluded nested plugin documentation).
+/docs/plans/
 
 # ── Secrets & Credentials ───────────────────────────
 .env
