@@ -1,0 +1,28 @@
+{
+  "name": "call_search_network_activity",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "search_network_activity",
+      "arguments": {
+        "software_name": "Google Chrome",
+        "limit": 10
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"destinations\": [{\"software_name\": \"Google Chrome\", \"hostname\": \"PROD-WEB-01\", \"destination_value\": \"42.11.22.33\", \"destination_type\": \"ip\", \"port\": 443, \"activity_type\": \"connection\", \"is_internal\": false, \"connection_count\": 9}], \"listeners\": [{\"software_name\": \"Google Chrome\", \"hostname\": \"PROD-WEB-01\", \"bind_address\": \"127.0.0.1\", \"port\": 9333, \"activity_type\": \"listener\", \"listener_count\": 1}], \"destination_count\": 1, \"listener_count\": 1}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

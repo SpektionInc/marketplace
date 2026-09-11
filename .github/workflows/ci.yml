@@ -1,0 +1,40 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Structural + parity validation
+        run: python3 scripts/validate_plugins.py . --verbose
+
+      - name: Contract parity gate
+        run: python3 scripts/parity_check.py --json
+
+      - name: Deterministic MCP contract smoke (fixtures, no credentials)
+        run: python3 plugins/spektion/scripts/contract_smoke.py --fixtures plugins/spektion/scripts/fixtures
+
+      - name: Validation regression tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Secret scan (no credentials, no external services)
+        run: |
+          set -euo pipefail
+          hits=$(grep -RInE 'sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|Bearer [A-Za-z0-9+/=]{20,}' \
+            --exclude-dir='.git' --exclude='*.jsonc' . || true)
+          if [ -n "$hits" ]; then
+            echo "Literal credential patterns found:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "Secret scan clean"

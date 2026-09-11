@@ -1,0 +1,27 @@
+{
+  "name": "call_get_detection_events",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "get_detection_events",
+      "arguments": {
+        "detection_id": "DET-00007"
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"detection_id\": \"DET-00007\", \"detection_name\": \"Weak Crypto\", \"impact\": \"high\", \"detail_url\": \"https://app.spektion.com/risks/DET-00007\", \"items\": [{\"software_id\": \"csw-5\", \"software_name\": \"Google Chrome\", \"first_seen\": \"2025-09-01T12:00:00Z\", \"process_path\": \"C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe\", \"module_name\": \"bcrypt.dll\", \"api_function_name\": \"BCryptEncrypt\", \"outputs\": {\"cipher\": \"RC4\"}}], \"total_count\": 1, \"returned\": 1}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

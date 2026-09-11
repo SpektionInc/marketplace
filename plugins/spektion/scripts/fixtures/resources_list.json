@@ -1,0 +1,42 @@
+{
+  "name": "resources_list",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "3",
+    "method": "resources/list",
+    "params": {}
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "3",
+    "result": {
+      "resources": [
+        {
+          "uri": "spektion://platforms",
+          "name": "Active Platforms",
+          "description": "Active Platforms"
+        },
+        {
+          "uri": "spektion://software-categories",
+          "name": "Software Categories",
+          "description": "Software Categories"
+        },
+        {
+          "uri": "spektion://software-publishers",
+          "name": "Software Publishers",
+          "description": "Software Publishers"
+        },
+        {
+          "uri": "spektion://sla-policy",
+          "name": "SLA Remediation Policy",
+          "description": "SLA Remediation Policy"
+        },
+        {
+          "uri": "spektion://detection-rules",
+          "name": "Detection Rule Library",
+          "description": "Detection Rule Library"
+        }
+      ]
+    }
+  }
+}

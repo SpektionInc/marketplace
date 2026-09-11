@@ -1,0 +1,27 @@
+{
+  "name": "call_search_vulnerabilities",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "search_vulnerabilities",
+      "arguments": {
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"items\": [{\"cve_id\": \"CVE-2025-21298\", \"name\": \"CVE-2025-21298\", \"severity\": \"critical\", \"score\": 9.8, \"risk_score\": 92, \"risk_severity\": \"critical\", \"kev\": true, \"platforms\": [\"windows\"], \"first_seen\": \"2025-02-12T10:00:00Z\", \"epss_score\": 0.95, \"exploit_maturity\": \"actively exploited\", \"has_remote_exploitability\": true, \"endpoint_count\": 14, \"is_used\": true, \"sla_due_date\": \"2025-03-05\", \"sla_status\": \"overdue\", \"detail_url\": \"https://app.spektion.com/vulnerabilities/CVE-2025-21298\"}], \"total_count\": 1, \"returned\": 1}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}
