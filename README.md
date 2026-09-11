@@ -32,7 +32,7 @@ Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) or your project's `.en
 
 ## What You Get
 
-### 19 MCP Tools (Native Access)
+### 20 MCP Tools (Native Access)
 
 Once installed, Claude can directly call these Spektion tools:
 
@@ -40,7 +40,7 @@ Once installed, Claude can directly call these Spektion tools:
 |----------|-------|
 | **Search** | `search_vulnerabilities`, `search_assets`, `search_software`, `search_detections`, `search_network_activity`, `search_secrets`, `search_ai_security_risks`, `search_executables`, `search_ai_sessions` |
 | **Details** | `get_vulnerability_details`, `get_asset_details`, `get_software_details`, `get_detection_events`, `get_detection_controls` |
-| **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` (tenant SLA/settings authority) |
+| **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` (required tenant SLA/settings authority at release), `count_ai_session_detections` |
 | **Paginated Queries** | `query_sensors` |
 
 ### 5 Resources
@@ -65,7 +65,7 @@ Prompts are reusable workflows the MCP server exposes; Claude chains the underly
 | `vulnerability_report` | `time_period?`, `severity?` | Vulnerability management report: severity breakdown, remediation metrics, SLA compliance, top CVEs, trends |
 | `software_risk_analysis` | `software_name?`, `grade?` | Software risk prioritization: riskiest products, deployment breadth, unused software, network exposure, blind spots |
 
-### 6 Analyst Workflow Skills
+### 7 Analyst Workflow Skills
 
 Skills provide guided, multi-step workflows for common analyst tasks:
 
@@ -77,6 +77,7 @@ Skills provide guided, multi-step workflows for common analyst tasks:
 | `remediation-tracking` | Track SLA compliance, remediation velocity, and blindspots |
 | `runtime-detection-analysis` | Translate behavioral detections into actionable threat narratives |
 | `security-reporting` | Generate executive and operational security reports |
+| `ai-security-analysis` | Count AI detections by distinct sessions and investigate matching sessions and findings |
 
 ## Example Queries
 
@@ -94,6 +95,12 @@ Skills provide guided, multi-step workflows for common analyst tasks:
 
 **Runtime Detections:**
 > "What critical runtime detections are active and do any correlate with known CVEs?"
+
+**AI Security:**
+> "Which AI detections fired on our Production servers in the last 30 days, and which sessions triggered them?"
+
+**Secrets:**
+> "What secret findings and credential types were recorded on PROD-WEB-01?"
 
 **Reporting:**
 > "Generate an executive security posture summary for leadership"
@@ -124,7 +131,8 @@ marketplace/
 │           ├── software-risk-analysis/
 │           ├── remediation-tracking/
 │           ├── runtime-detection-analysis/
-│           └── security-reporting/
+│           ├── security-reporting/
+│           └── ai-security-analysis/
 ├── scripts/
 │   ├── parity_check.py
 │   ├── test_validation.py
@@ -135,10 +143,38 @@ marketplace/
 
 ## Development
 
-The pinned contract records the exact `spektionapi` source revision from which
-it was generated. Publish only after credentialed acceptance passes against the
-target MCP deployment; repository parity alone does not prove that revision is
-deployed.
+The plugin targets **1.1.0**, with 20 read-only tools and seven analyst skills.
+The contract records separate provenance for the current tool registry/input
+schemas (`source`) and the resource/prompt release requirements
+(`release_surface_source`). The latter come from the API hardening candidate
+that the existing PR already requires; this is a combined release contract,
+not a claim that API master already implements every behavior.
+
+At the reviewed API master revision, tenant settings and the SLA resource still
+return placeholders, and three prompt bodies lack the required guidance. Use
+the bundled skills for these workflows; never infer a tenant SLA policy from a
+placeholder. The credentialed release gate continues to reject those responses.
+Publish only after the target deployment combines the new tools with the API
+hardening and passes live acceptance. See the [capability review](plugins/spektion/docs/mcp-capability-review-2026-09-11.md)
+for the source revisions, tool boundaries, and remaining service dependencies.
+
+AI detection prevalence uses distinct session counts with both denominators;
+scanner findings are a separate population. Session drill-through preserves the
+same recency and asset scope. Asset secret counts represent latest-scan findings,
+not unique credentials, and zero does not establish that an asset was scanned.
+
+### Refresh tool schemas
+
+```bash
+python3 scripts/refresh_contract.py --api ../spektionapi
+python3 scripts/refresh_contract.py --api ../spektionapi --check
+```
+
+The exporter reads the Go registry and actual MCP adapter from a clean tracked
+API checkout. It requires that checkout's Go dependencies. It refreshes tool
+schemas and discovery fixtures, including array element types and MCP numeric
+types. Resource/prompt requirements and synthetic response fixtures are retained
+for explicit review; they are not recordings from the current deployment.
 
 ### Validate
 

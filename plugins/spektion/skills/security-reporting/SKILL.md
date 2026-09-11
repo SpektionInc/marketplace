@@ -1,6 +1,6 @@
 ---
 name: security-reporting
-description: Generate executive and operational security reports from Spektion data. Produces structured reports covering security posture, vulnerability metrics, remediation trends, top risks, and actionable recommendations.
+description: Generate executive and operational security reports from Spektion data. Produces structured reports covering security posture, vulnerability metrics, remediation trends, top risks, AI detection prevalence, and actionable recommendations.
 ---
 
 # Security Reporting
@@ -77,7 +77,9 @@ Call `search_detections` with `highest_impact: critical`, `sort_by: highest_impa
 
 **AI security and secrets (operational reports, when relevant):**
 - Call `search_ai_security_risks` to surface AI/agent security detections (filter by `severity` or `source: runtime|scan`; results include CVSS v3.1/v4.0 scores and matched params)
-- Call `search_secrets` to surface exposed credentials and API keys (filter by `severity`, `rule_name`, or `hostname`)
+- Call `count_ai_session_detections` for AI detection prevalence with a stated `recency_days` window and requested asset scope. Report distinct sessions per rule alongside `sessions_with_detections` and `sessions_total`; counts overlap and must not be summed. Inspect scope/error messages before interpreting zeros. Scanner findings are outside this census.
+- Call `search_ai_sessions` to drill into a census row using its returned `detection_id` as an array, copying the same recency window and all shared scope filters. Its `total_count` is the matching population; `returned` is a page size.
+- Call `search_secrets` for finding metadata; use exact `asset_id` for a single asset. Report `total_count` as findings, not unique credentials or a count of returned rows. Asset `secret_count` is latest-scan findings; zero does not distinguish unscanned from clean. Detector types come from `outputs.name`; do not copy credential values into the report.
 
 ### Step 4: Synthesize Report
 
@@ -148,6 +150,8 @@ Include the vulnerability delta from trends data to show if the backlog is growi
 | Search critical CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by`, `limit`, `offset` |
 | Search risky software | `search_software` | `sort_by: cve_count`, `limit` |
 | Search detections | `search_detections` | `highest_impact`, `sort_by: highest_impact`, `limit` |
+| Count AI detection prevalence | `count_ai_session_detections` | `recency_days`, `hostname`, `agent`, `classification`, `severity`, `asset_tags`, `asset_importance`, `asset_type` |
+| Drill into AI sessions | `search_ai_sessions` | `detection_id`, `recency_days`, `hostname`, `agent`, `classification`, `severity`, `asset_tags`, `asset_importance`, `asset_type`, `limit`, `offset` |
 | Search AI security risks | `search_ai_security_risks` | `severity`, `source`, `rule_name`, `sort_by`, `limit` |
 | Search exposed secrets | `search_secrets` | `severity`, `rule_name`, `hostname`, `sort_by`, `limit` |
 | View platforms | Resource: `spektion://platforms` | N/A |

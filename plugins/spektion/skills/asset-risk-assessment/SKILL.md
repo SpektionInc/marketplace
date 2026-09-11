@@ -1,6 +1,6 @@
 ---
 name: asset-risk-assessment
-description: Perform deep-dive risk assessments on individual endpoints or groups of assets. Combines installed software, vulnerabilities, network exposure, runtime detections, and business impact into prioritized hardening recommendations.
+description: Perform deep-dive risk assessments on individual endpoints or groups of assets. Combines installed software, vulnerabilities, network exposure, runtime detections, secret findings, and business impact into prioritized hardening recommendations.
 ---
 
 # Asset Risk Assessment
@@ -81,6 +81,16 @@ Call `search_detections` filtered by the endpoint's `platform` or via the asset'
 - Review `cve_likelihood` (`probability`: `"high"`, `"medium"`, or `"low"` and `description`) to connect behavioral detections to potential CVE exploitation
 - `search_detections` returns `endpoint_count`, `software_count`, and `elevated_software_count` per detection, so assess spread directly; use `offset` to page
 
+### Secret Findings and AI Activity
+
+Read `secret_count` from asset rows or `get_asset_details.endpoint`. It counts findings from the latest secret scan, one per detector and location; the same credential in two files counts twice. Zero means "no secret findings recorded" and cannot distinguish never scanned from scanned clean. Removed sensors can report zero while other counts linger.
+
+For individual findings, call `search_secrets` using the exact `asset_id` returned by the asset tool. A hostname filter matches partially and can include other assets. Compare `total_count` to `secret_count` with no additional severity/rule filters, not to the capped `items` length. The tool has no offset: disclose incomplete detail when the count exceeds the returned list.
+
+`get_asset_details.endpoint.secret_types` contains deduplicated detector names. Match these against findings' `outputs.name`, not `rule_name`. Missing `secret_types` means the lookup did not answer; an empty array can mean no named types even when `secret_count` is positive. Neither means clean. Report detector type and returned file-location metadata without reproducing credential values.
+
+When AI activity matters, call `search_ai_sessions` with the exact `asset_id` and an explicit `recency_days` window. Use `search_ai_security_risks` with the same asset ID for finding context, preserving its separate last-90-days population. For group-level detection prevalence, use the AI security analysis workflow's census and matching scope.
+
 ### Step 5: Evaluate Business Impact
 
 Combine findings with the endpoint's business context:
@@ -103,7 +113,7 @@ Deliver a structured assessment:
    - If `detective_control_error` is set, say the detective control is temporarily unavailable and suggest retrying — do not claim Spektion has none.
 
 **Optional depth (only when they add material value to the assessment):**
-- `search_secrets` — check the host (or the whole fleet) for exposed credentials, API keys, and tokens; follow up with `rule_name`/`severity` filters.
+- Use the secret findings workflow above for exact-asset credential exposure; severity/type filtering changes the population being counted.
 - `search_executables` — hunt for unsigned or untrusted executables (filter `is_signed: false`); note `detection_count` and per-hash `detections[]` link to runtime weaknesses.
 
 ## External Enrichment (Optional)
@@ -126,6 +136,7 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 | Check network exposure | `search_network_activity` | `software_name` (required), `limit` |
 | Find runtime detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit`, `offset` |
 | Get controls for a weakness | `get_detection_controls` | `detection_id` (required) |
-| Find exposed secrets | `search_secrets` | `hostname`, `severity`, `rule_name`, `sort_by`, `limit` |
+| Find exposed secrets | `search_secrets` | `asset_id`, `hostname`, `severity`, `rule_name`, `sort_by`, `limit` |
+| Inspect asset AI sessions | `search_ai_sessions` | `asset_id`, `recency_days`, `limit`, `offset` |
 | Hunt executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit` |
 | View platform inventory | Resource: `spektion://platforms` | N/A |

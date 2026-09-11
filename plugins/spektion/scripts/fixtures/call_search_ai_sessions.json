@@ -7,7 +7,12 @@
     "params": {
       "name": "search_ai_sessions",
       "arguments": {
-        "limit": 5
+        "detection_id": [
+          "DET-AI-1020"
+        ],
+        "recency_days": 30,
+        "asset_type": "server",
+        "limit": 1
       }
     }
   },
@@ -18,7 +23,7 @@
       "content": [
         {
           "type": "text",
-          "text": "{\"items\": [{\"session_id\": \"sess-901\", \"hostname\": \"DEV-LAP-3\", \"platform\": \"macos\", \"asset_id\": \"ast-3\", \"agent\": \"claude\", \"classification\": \"coding\", \"severity_max\": \"high\", \"started_at\": \"2025-09-02T08:00:00Z\", \"duration\": 3600, \"is_interim\": false, \"metric_processes\": 12, \"metric_connections\": 40, \"metric_detections\": 2, \"metric_risk_flags\": 1, \"metric_file_writes\": 300, \"detections\": [{\"id\": \"DET-AI-5\", \"name\": \"Agent Spawned Nested Agent\"}], \"risk_flags\": [\"exfil_pattern\"], \"detail_url\": \"https://app.spektion.com/ai-sessions/sess-901\"}], \"total_count\": 1, \"returned\": 1, \"offset\": 0}"
+          "text": "{\"items\": [{\"session_id\": \"sess-901\", \"hostname\": \"DEV-LAP-3\", \"platform\": \"macos\", \"asset_id\": \"fixture-asset-001\", \"agent\": \"claude\", \"classification\": \"coding\", \"severity_max\": \"high\", \"started_at\": \"2025-09-02T08:00:00Z\", \"duration\": 3600, \"is_interim\": false, \"metric_processes\": 12, \"metric_connections\": 40, \"metric_detections\": 2, \"metric_risk_flags\": 1, \"metric_file_writes\": 300, \"detections\": [{\"id\": \"DET-AI-1020\", \"name\": \"Credential file reads\"}], \"risk_flags\": [\"exfil_pattern\"], \"detail_url\": \"https://app.spektion.com/ai-sessions/sess-901\"}], \"total_count\": 3, \"returned\": 1, \"offset\": 0}"
         }
       ],
       "isError": false

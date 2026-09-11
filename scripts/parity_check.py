@@ -49,7 +49,7 @@ EXTERNAL_TOOLS = {
     "get_vulnerability_detection_signatures",
 }
 
-TOOL_RE = re.compile(r"\b(?:search|get|query)_[a-z0-9_]+\b")
+TOOL_RE = re.compile(r"\b(?:search|get|query|count)_[a-z0-9_]+\b")
 # Full inline-code assignments such as `sort_by: grade` or `source: runtime|scan`.
 CODE_PARAM_VALUE_RE = re.compile(r"^([a-z_]+)\s*[:=]\s*(.+)$")
 # parenthesized enum lists that follow a backticked param name: `sort_by` (a, b, c)
@@ -74,16 +74,20 @@ def tools_by_name(contract):
 
 
 def validate_contract(contract, errors):
-    if contract.get("schema_version") != "1.1":
-        errors.append("contract: schema_version must be '1.1'")
+    if contract.get("schema_version") != "1.2":
+        errors.append("contract: schema_version must be '1.2'")
     source = contract.get("source") or {}
     if source.get("repository") != SOURCE_REPOSITORY:
         errors.append(f"contract: source.repository must be {SOURCE_REPOSITORY!r}")
     revision = source.get("revision") or ""
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         errors.append("contract: source.revision must be a full 40-character git SHA")
-    if source.get("generator") != "cmd/mcp-contract":
-        errors.append("contract: source.generator must be 'cmd/mcp-contract'")
+    if source.get("generator") != "scripts/export_mcp_tools.go":
+        errors.append("contract: source.generator must be 'scripts/export_mcp_tools.go'")
+    release_source = contract.get("release_surface_source") or {}
+    if (release_source.get("repository") != SOURCE_REPOSITORY or
+            not re.fullmatch(r"[0-9a-f]{40}", release_source.get("revision", ""))):
+        errors.append("contract: resource/prompt release requirements need separate source provenance")
 
     tools = contract.get("mcp", {}).get("tools", [])
     names = [t.get("name") for t in tools]
@@ -96,6 +100,10 @@ def validate_contract(contract, errors):
             errors.append(f"contract: MCP tool '{name}' must be read-only")
         if "mcp" not in (tool.get("lanes") or []):
             errors.append(f"contract: MCP tool '{name}' is missing the mcp lane")
+        for param in tool.get("params", []):
+            if param["type"] == "array" and param.get("item_type") not in {
+                    "string", "integer", "boolean"}:
+                errors.append(f"contract: {name}.{param['name']} needs an array item type")
     for resource in contract.get("resources", []):
         if not resource.get("registration_description"):
             errors.append(
@@ -299,6 +307,13 @@ def validate_readme_surface(contract, errors):
         errors.append(f"{README}: missing README.md")
         return
     text = README.read_text()
+
+    tool_rows = _table_rows(text, f"### {len(contract['mcp']['tools'])} MCP Tools (Native Access)")
+    advertised = {name for row in tool_rows for cell in row for name in TOOL_RE.findall(cell)}
+    expected_tools = set(tools_by_name(contract))
+    if advertised != expected_tools:
+        errors.append(f"README: tool table mismatch: missing={sorted(expected_tools-advertised)} "
+                      f"extra={sorted(advertised-expected_tools)}")
 
     resource_rows = _table_rows(text, f"### {len(contract['resources'])} Resources")
     actual_resources = {}

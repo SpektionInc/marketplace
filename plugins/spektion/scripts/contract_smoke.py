@@ -70,12 +70,14 @@ def _first(doc, key):
     return None
 
 TOOL_ENVELOPE = {
+    "count_ai_session_detections": {"keys": ["items", "distinct_by",
+        "sessions_with_detections", "sessions_total", "returned"]},
     "get_security_posture": {"keys": ["total_assets", "active_assets", "assets_by_platform",
                                       "software_by_platform", "vulnerabilities_by_severity"]},
     "search_vulnerabilities": {"keys": ["items"], "items": ["cve_id", "severity", "score",
                                                             "endpoint_count", "sla_status"]},
     "search_assets": {"keys": ["items"], "items": ["hostname", "exposure_score",
-                                                   "exposure_severity", "importance"]},
+                                                   "exposure_severity", "importance", "asset_id", "secret_count"]},
     "search_software": {"keys": ["items"], "items": ["name", "grade", "cve_count", "score"]},
     "search_detections": {"keys": ["items"], "items": ["id", "endpoint_count",
                                                        "software_count", "cve_likelihood"]},
@@ -87,11 +89,11 @@ TOOL_ENVELOPE = {
                                                               "rule_name", "severity"]},
     "search_executables": {"keys": ["items"], "items": ["hash", "is_signed", "asset_count"]},
     "search_ai_sessions": {"keys": ["items"], "items": ["session_id", "agent",
-                                                        "severity_max"]},
+                                                        "severity_max", "asset_id", "detections"]},
     "query_sensors": {"keys": ["items", "total_count", "count", "offset", "summary"],
                       "items": ["sensor_id", "hostname", "os_family", "agent_version"]},
     "get_asset_details": {"keys": ["endpoint", "installed_software", "network_activity"],
-                          "items": ["hostname", "exposure_score", "risks"]},
+                          "items": ["hostname", "exposure_score", "risks", "asset_id", "secret_count"]},
     "get_software_details": {"keys": ["items"], "items": ["software"]},
     "get_vulnerability_details": {"keys": ["cve_id", "severity", "score", "sla_status",
                                            "impacted_software", "impacted_endpoints"]},
@@ -150,11 +152,17 @@ def assert_tools_list(contract, result):
                     sorted(set(exp_params) - set(props)),
                     sorted(set(props) - set(exp_params))))
         for pname, p in exp_params.items():
-            if props[pname].get("type") != p["type"]:
+            expected_type = p.get("mcp_type", p["type"])
+            if props[pname].get("type") != expected_type:
                 raise AssertionError(
-                    f"tool {name}.{pname}: type {props[pname].get('type')} != {p['type']}")
+                    f"tool {name}.{pname}: type {props[pname].get('type')} != {expected_type}")
+            value_schema = props[pname]
+            if p["type"] == "array":
+                value_schema = props[pname].get("items") or {}
+                if value_schema.get("type") != p.get("item_type"):
+                    raise AssertionError(f"tool {name}.{pname}: array item type mismatch")
             if p.get("enum"):
-                if sorted(props[pname].get("enum", [])) != sorted(p["enum"]):
+                if sorted(value_schema.get("enum", [])) != sorted(p["enum"]):
                     raise AssertionError(
                         f"tool {name}.{pname}: enum mismatch "
                         f"{props[pname].get('enum')} != {p['enum']}")
@@ -305,6 +313,8 @@ def assert_tool_result(tool_name, resp, require_schema=True):
     for key in spec.get("keys", []):
         if key not in doc:
             raise AssertionError(f"tool {tool_name}: missing envelope key '{key}'")
+    if tool_name == "count_ai_session_detections":
+        assert_census(doc)
     item_keys = spec.get("items") or []
     if item_keys:
         first = doc.get("items") or doc.get(ITEM_KEY.get(tool_name))
@@ -316,6 +326,30 @@ def assert_tool_result(tool_name, resp, require_schema=True):
             if key not in first:
                 raise AssertionError(f"tool {tool_name}: first item missing '{key}'")
     return doc
+
+
+def assert_census(doc):
+    if doc["distinct_by"] != "session":
+        raise AssertionError("census: distinct_by must be session")
+    for key in ("sessions_total", "sessions_with_detections", "returned"):
+        if not _type_matches(doc[key], "integer") or doc[key] < 0:
+            raise AssertionError(f"census: invalid {key}")
+    if doc["sessions_with_detections"] > doc["sessions_total"]:
+        raise AssertionError("census: detected sessions exceed total sessions")
+    if not isinstance(doc["items"], list) or doc["returned"] != len(doc["items"]):
+        raise AssertionError("census: returned must match items length")
+    ids = set()
+    for row in doc["items"]:
+        for key in ("detection_id", "detection_name"):
+            if not isinstance(row.get(key), str) or not row[key]:
+                raise AssertionError(f"census: missing {key}")
+        count = row.get("session_count")
+        if not _type_matches(count, "integer") or not 0 < count <= doc["sessions_with_detections"]:
+            raise AssertionError("census: invalid session_count")
+        if row["detection_id"] in ids:
+            raise AssertionError("census: duplicate detection_id")
+        ids.add(row["detection_id"])
+    # Rule counts overlap. Their sum need not equal either denominator.
 
 
 def _type_matches(value, expected):
@@ -361,7 +395,12 @@ def assert_tool_call_request(contract, fx):
         if not _type_matches(value, spec["type"]):
             raise AssertionError(
                 f"tool {name}.{arg_name}: value type does not match {spec['type']}")
-        if spec.get("enum") and value not in spec["enum"]:
+        if spec["type"] == "array":
+            if any(not _type_matches(item, spec["item_type"]) for item in value):
+                raise AssertionError(f"tool {name}.{arg_name}: invalid array item type")
+            if spec.get("enum") and any(item not in spec["enum"] for item in value):
+                raise AssertionError(f"tool {name}.{arg_name}: invalid array item enum")
+        elif spec.get("enum") and value not in spec["enum"]:
             raise AssertionError(f"tool {name}.{arg_name}: invalid enum value {value!r}")
     return name
 
@@ -565,9 +604,11 @@ def run_live(contract):
 
     # Discovery order matters: run searches first so dependent tools have args.
     discovered = {}
-    order = ["search_vulnerabilities", "search_assets", "search_software", "search_detections"]
+    order = ["search_vulnerabilities", "search_assets", "search_software", "search_detections",
+             "count_ai_session_detections"]
     for name in order:
-        resp = call("tools/call", {"name": name, "arguments": {"limit": 5}})
+        args = {"recency_days": 30} if name == "count_ai_session_detections" else {"limit": 5}
+        resp = call("tools/call", {"name": name, "arguments": args})
         try:
             doc = assert_tool_result(name, resp)
         except AssertionError as e:
@@ -576,28 +617,38 @@ def run_live(contract):
         items = doc.get("items") or []
         if items:
             first = items[0]
+            if name == "search_assets":
+                first = next((item for item in items if item.get("secret_count", 0) > 0), first)
             if name == "search_vulnerabilities" and "cve_id" not in discovered:
                 discovered["cve_id"] = first.get("cve_id")
             elif name == "search_assets" and "hostname" not in discovered:
                 discovered["hostname"] = first.get("hostname")
+                discovered["asset_id"] = first.get("asset_id")
+                discovered["secret_count"] = first.get("secret_count")
             elif name == "search_software" and "name" not in discovered:
                 discovered["software_name"] = first.get("name")
             elif name == "search_detections" and "id" not in discovered:
                 discovered["detection_id"] = first.get("id")
+            elif name == "count_ai_session_detections":
+                discovered["ai_detection_id"] = first.get("detection_id")
+                discovered["ai_session_count"] = first.get("session_count")
 
     args_for = {
         "search_vulnerabilities": {"limit": 5},
         "search_assets": {"limit": 5},
         "search_software": {"limit": 5},
         "search_detections": {"limit": 5},
-        "search_secrets": {"limit": 5},
+        "search_secrets": {"asset_id": discovered.get("asset_id") or "", "limit": 5},
         "search_ai_security_risks": {"limit": 5},
         "search_executables": {"limit": 5},
-        "search_ai_sessions": {"limit": 5},
+        "search_ai_sessions": {"limit": 5, "recency_days": 30,
+                               "detection_id": [discovered["ai_detection_id"]]
+                               if discovered.get("ai_detection_id") else []},
         "query_sensors": {"limit": 5},
         "get_security_posture": {},
         "get_remediation_metrics": {},
         "get_vulnerability_trends": {},
+        "get_tenant_settings": {},
         "search_network_activity": {"software_name": discovered.get("software_name") or "", "limit": 5},
         "get_software_details": {"software_name": discovered.get("software_name") or ""},
         "get_asset_details": {"hostname": discovered.get("hostname") or ""},
@@ -619,7 +670,18 @@ def run_live(contract):
             continue
         resp = call("tools/call", {"name": name, "arguments": args})
         try:
-            assert_tool_result(name, resp)
+            doc = assert_tool_result(name, resp)
+            if name == "search_ai_sessions" and doc.get("total_count") != discovered["ai_session_count"]:
+                raise AssertionError("census/session total mismatch with the same 30-day window; "
+                                     "check service parity or telemetry changes between calls")
+            if name == "search_ai_sessions" and any(
+                    discovered["ai_detection_id"] not in {d.get("id") for d in row.get("detections", [])}
+                    for row in doc["items"]):
+                raise AssertionError("session drill-through returned a row without the requested detection")
+            if name == "search_secrets" and doc.get("total_count") != discovered.get("secret_count"):
+                raise AssertionError("asset secret_count differs from exact-asset findings total_count")
+            if name == "get_asset_details" and "secret_types" not in doc["endpoint"]:
+                raise AssertionError("asset secret_types unavailable; enrichment did not answer")
         except AssertionError as e:
             errors.append(f"{name}: {e}")
 
