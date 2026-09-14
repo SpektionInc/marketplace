@@ -69,7 +69,16 @@ Call `search_vulnerabilities` with `kev: true`, `sort_by: epss_score`, `limit: 1
 Call `search_software` with `sort_by: cve_count`, `limit: 10`.
 
 **Runtime detections:**
-Call `search_detections` with `highest_impact: critical`, `sort_by: highest_impact`, `limit: 10`.
+Call `search_detections` with `sort_by: endpoint_count`, `limit: 20`, then report the critical/high rows by their returned `highest_impact` field. (Do not use the server-side `highest_impact` filter or `sort_by: highest_impact` — they currently return zero rows / mis-ordered results; ENG-3614.)
+
+**Secrets exposure:**
+Call `search_secrets` with `sort_by: severity`, `limit: 10` and read `total_count` for the tenant-wide finding count. Report it as "recorded secret findings" — secret scanning is opt-in per asset, so the absence of findings is not evidence of absence.
+
+**AI agent activity:**
+Call `count_ai_session_detections` (with `recency_days: 30` for a current view) for a census of AI-session detections by rule, then `search_ai_sessions` with `severity: critical` or `high` and the same `recency_days` for the sessions behind them. Call `search_ai_security_risks` for AI-related risk findings outside sessions. *(`count_ai_session_detections` requires a server build newer than 2026-09; if it is not in your tool list, use `search_ai_sessions` alone.)*
+
+**SLA context:**
+Call `get_tenant_settings` to report compliance against the tenant's configured SLA policy rather than generic thresholds.
 
 ### Step 4: Synthesize Report
 
@@ -114,6 +123,9 @@ Structure the report based on audience:
 ## Runtime Detection Activity
 [Critical/high detections by category (`runtime_weakness`, `exploit_impact`, `remotely_exploitable`), CVE correlation via `cve_likelihood`, affected scope]
 
+## Secrets & AI Agent Activity
+[Recorded secret findings by severity; AI session counts, detection census, critical/high sessions]
+
 ## Action Items
 [Prioritized list with specific CVEs, software, endpoints to address]
 ```
@@ -136,5 +148,10 @@ Include the vulnerability delta from trends data to show if the backlog is growi
 | Get vulnerability trends | `get_vulnerability_trends` | `severity`, `platform`, `start_time`, `end_time` |
 | Search critical CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by`, `limit` |
 | Search risky software | `search_software` | `sort_by: cve_count`, `limit` |
-| Search detections | `search_detections` | `highest_impact`, `sort_by: highest_impact`, `limit` |
+| Search detections | `search_detections` | `sort_by: endpoint_count`, `limit` (impact triage client-side — ENG-3614) |
+| Count secret findings | `search_secrets` | `severity`, `sort_by`, `limit` (read `total_count`) |
+| AI detection census | `count_ai_session_detections` | `severity`, `recency_days` |
+| Search AI sessions | `search_ai_sessions` | `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
+| Search AI risk findings | `search_ai_security_risks` | `severity`, `source`, `limit`, `offset` |
+| Get SLA policy | `get_tenant_settings` | (none) |
 | View platforms | Resource: `spektion://platforms` | N/A |

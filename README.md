@@ -32,16 +32,21 @@ Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) or your project's `.en
 
 ## What You Get
 
-### 16 MCP Tools (Native Access)
+### 20 MCP Tools (Native Access)
 
 Once installed, Claude can directly call these Spektion tools:
 
 | Category | Tools |
 |----------|-------|
-| **Search** | `search_vulnerabilities`, `search_endpoints`, `search_software`, `search_detections`, `search_network_activity` |
-| **Details** | `get_vulnerability_details`, `get_endpoint_details`, `get_software_details` |
+| **Search** | `search_assets`, `search_vulnerabilities`, `search_software`, `search_detections`, `search_executables`, `search_secrets`, `search_network_activity` |
+| **Details** | `get_asset_details`, `get_vulnerability_details`, `get_software_details`, `get_detection_events`, `get_detection_controls` |
+| **AI Security** | `search_ai_sessions`, `search_ai_security_risks`, `count_ai_session_detections`* |
 | **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` |
-| **Paginated Queries** | `query_sensors`, `query_software_inventory`, `query_detection_events`, `query_vulnerability_data` |
+| **Sensors** | `query_sensors` |
+
+\* `count_ai_session_detections` requires a Spektion MCP server build newer than 2026-09; older deployments expose 19 tools.
+
+Most `search_*` tools accept asset-scope parameters (`asset_tags`, `asset_importance`, `asset_type`) to scope any question to a subset of the fleet — e.g. "critical CVEs on my production servers".
 
 ### 5 Resources
 
@@ -51,7 +56,7 @@ Once installed, Claude can directly call these Spektion tools:
 | `spektion://software-categories` | Software category taxonomy |
 | `spektion://software-publishers` | Publisher list |
 | `spektion://detection-rules` | Detection rule index (use `search_detections` for queries) |
-| `spektion://sla-policy` | SLA remediation policy (coming soon) |
+| `spektion://sla-policy` | SLA remediation policy |
 
 ### 6 Analyst Workflow Skills
 
@@ -72,7 +77,7 @@ Skills provide guided, multi-step workflows for common analyst tasks:
 > "Triage CVE-2025-21298 — is it in our environment and how urgent is it?"
 
 **Asset Risk:**
-> "Assess the risk on endpoint PROD-WEB-01"
+> "Assess the risk on asset PROD-WEB-01"
 
 **Software Risk:**
 > "What are the top 10 riskiest software products in our environment?"
