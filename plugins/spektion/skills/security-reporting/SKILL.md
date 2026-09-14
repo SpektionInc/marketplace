@@ -78,7 +78,7 @@ Call `search_secrets` with `sort_by: severity`, `limit: 10` and read `total_coun
 Call `count_ai_session_detections` (with `recency_days: 30` for a current view) for a census of AI-session detections by rule, then `search_ai_sessions` with `severity: critical` or `high` and the same `recency_days` for the sessions behind them. Call `search_ai_security_risks` for AI-related risk findings outside sessions. *(`count_ai_session_detections` requires a server build newer than 2026-09; if it is not in your tool list, use `search_ai_sessions` alone.)*
 
 **SLA context:**
-Call `get_tenant_settings` to report compliance against the tenant's configured SLA policy rather than generic thresholds.
+Read the server-computed `sla_status` field on `search_vulnerabilities` results to report overdue vs within-SLA per CVE. (`get_tenant_settings` currently returns a placeholder message, not the SLA policy — do not source thresholds from it.)
 
 ### Step 4: Synthesize Report
 
@@ -153,5 +153,5 @@ Include the vulnerability delta from trends data to show if the backlog is growi
 | AI detection census | `count_ai_session_detections` | `severity`, `recency_days` |
 | Search AI sessions | `search_ai_sessions` | `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
 | Search AI risk findings | `search_ai_security_risks` | `severity`, `source`, `limit`, `offset` |
-| Get SLA policy | `get_tenant_settings` | (none) |
+| Per-CVE SLA status | `search_vulnerabilities` | read `sla_status` on results (`get_tenant_settings` is a placeholder today) |
 | View platforms | Resource: `spektion://platforms` | N/A |

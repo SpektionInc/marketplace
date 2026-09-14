@@ -70,8 +70,9 @@ Call `search_detections` to find detections associated with the software:
 
 For risk that software-level views miss, call `search_executables`:
 - `is_linked_to_software: false` — binaries not attributed to any canonical software (shadow IT, droppers, custom tooling)
-- `is_signed: "false"` — unsigned executables; combine with `sort_by: asset_count` to find widespread unsigned binaries
+- `is_signed: "false"` — unsigned executables
 - Each result includes signing/trust status, asset count, detection categories, and per-detection details (name, category, severity, cve_likelihood)
+- Reach caveat: results cover the newest ~100 executables fleet-wide; `sort_by` and `total_count` are unreliable until ENG-3606 — rank the returned rows by `asset_count` client-side instead
 
 ### Step 6: Produce Risk Ranking
 
@@ -111,6 +112,6 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 | Get software details | `get_software_details` | `software_name` (required) |
 | Check network behavior | `search_network_activity` | `software_name` (required), `limit` |
 | Find runtime detections | `search_detections` | `name`, `category`, `platform`, `sort_by`, `limit`, `offset` |
-| Find risky executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit` |
+| Find risky executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `limit` (newest ~100; ENG-3606) |
 | View categories | Resource: `spektion://software-categories` | N/A |
 | View publishers | Resource: `spektion://software-publishers` | N/A |

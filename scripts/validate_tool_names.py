@@ -42,8 +42,6 @@ ALLOWLIST = {
     "get_vulnerability_exploitations",
     "get_mentioned_threat_actors",
     "get_vulnerability_detection_signatures",
-    # Chat-only Spektion tool mentioned as reference-only (not MCP-visible).
-    "get_executable_details",
 }
 
 TOKEN_RE = re.compile(r"\b(?:search|get|query|count)_[a-z0-9_]+\b")

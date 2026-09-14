@@ -89,7 +89,7 @@ Call `search_detections` filtered by the asset's `platform`:
 
 **AI agent activity:** call `search_ai_sessions` with `hostname` to see AI coding-agent sessions on the asset (agent, classification, severity, detections fired), and `search_ai_security_risks` with `asset_id` for AI-related risk findings. Sessions with critical/high severity detections are an attack-surface dimension the software inventory does not show.
 
-**Unattributed binaries:** call `search_executables` with `is_linked_to_software: false` (optionally `is_signed: "false"`) to surface executables not linked to any canonical software — unsigned, unattributed binaries on a high-importance asset warrant investigation.
+**Unattributed binaries:** call `search_executables` with `is_linked_to_software: false` (optionally `is_signed: "false"`) to surface unlinked executables among the newest ~100 fleet-wide — unsigned, unattributed binaries on a high-importance asset warrant investigation. (Reach caveat: newest ~100 executables only; `sort_by`/`total_count` unreliable until ENG-3606.)
 
 ### Step 6: Evaluate Business Impact
 
@@ -119,7 +119,7 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 
 ## Scoping to a Fleet Subset
 
-Every `search_*` tool accepts asset-scope parameters to answer questions like "assess my production servers": `asset_tags` (tag names as the user says them, e.g. "Production", "PCI"), `asset_importance` (Business Impact tiers 1=critical … 5=minimal), and `asset_type` (workstation or server). Each has an `_op` companion (`equals`/`notEqual`).
+Most `search_*` tools accept asset-scope parameters to answer questions like "assess my production servers": `asset_tags` (tag names as the user says them, e.g. "Production", "PCI"), `asset_importance` (Business Impact tiers 1=critical … 5=minimal), and `asset_type` (workstation or server). Each has an `_op` companion (`equals`/`notEqual`). Exceptions: `search_secrets`, `search_ai_security_risks`, and `search_network_activity` do not accept scope parameters — do not pass them there, since results would come back unscoped.
 
 ## Quick Reference
 
@@ -134,5 +134,5 @@ Every `search_*` tool accepts asset-scope parameters to answer questions like "a
 | List secret findings | `search_secrets` | `asset_id`, `severity`, `sort_by`, `limit` |
 | List AI agent sessions | `search_ai_sessions` | `hostname`, `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
 | Find AI risk findings | `search_ai_security_risks` | `asset_id`, `severity`, `source`, `limit`, `offset` |
-| Find unattributed binaries | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit` |
+| Find unattributed binaries | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `limit` (newest ~100; ENG-3606) |
 | View platform inventory | Resource: `spektion://platforms` | N/A |
