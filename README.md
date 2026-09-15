@@ -56,7 +56,7 @@ Most `search_*` tools accept asset-scope parameters (`asset_tags`, `asset_import
 | `spektion://software-categories` | Software category taxonomy |
 | `spektion://software-publishers` | Publisher list |
 | `spektion://detection-rules` | Detection rule index (use `search_detections` for queries) |
-| `spektion://sla-policy` | SLA remediation policy |
+| `spektion://sla-policy` | SLA remediation policy *(returns a placeholder today — for per-CVE SLA compliance use the `sla_status` field on `search_vulnerabilities`)* |
 
 ### 6 Analyst Workflow Skills
 

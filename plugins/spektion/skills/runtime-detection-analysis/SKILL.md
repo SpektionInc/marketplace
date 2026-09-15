@@ -64,7 +64,7 @@ To assess the deployment scope of the affected software, call `search_software` 
 
 ### Step 4: Map Endpoint Impact
 
-Each `search_detections` row carries the affected asset count. To find the highest-risk assets on the affected platform, use `search_assets` sorted by `detection_count` or `cve_count`; each returned asset includes a `risks` array (risk_id, risk_name, category), so you can confirm which assets exhibit the specific detection. For critical assets, call `get_asset_details` with the exact hostname to understand the full risk context.
+Each `search_detections` row carries the affected asset count. To find the highest-risk assets on the affected platform, use `search_assets` sorted by `detection_count` or `cve_count`; each returned asset includes a `risks` array (risk_id, risk_name, category). Read that array as **risks associated with the asset's installed software**, not as observed behavior: an asset inherits a detection when any asset shares the same canonical software, even if it never triggered the detection itself. Do not claim a specific asset exhibited the behavior — `get_detection_events` evidence is per-software and fleet-wide, so asset-level observation is not available from this surface; attribute behavior to the software, and to assets only as "at risk via installed software". For critical assets, call `get_asset_details` with the exact hostname to understand the full risk context.
 
 ### Step 5: Check Network Context
 

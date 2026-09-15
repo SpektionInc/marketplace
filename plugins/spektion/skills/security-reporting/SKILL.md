@@ -69,7 +69,7 @@ Call `search_vulnerabilities` with `kev: true`, `sort_by: epss_score`, `limit: 1
 Call `search_software` with `sort_by: cve_count`, `limit: 10`.
 
 **Runtime detections:**
-Call `search_detections` with `sort_by: endpoint_count`, `limit: 20`, then report the critical/high rows by their returned `highest_impact` field. (Do not use the server-side `highest_impact` filter or `sort_by: highest_impact` — they currently return zero rows / mis-ordered results; ENG-3614.)
+Call `search_detections` with `sort_by: endpoint_count`, `limit: 100`, and page with `offset` until a page returns fewer than `limit` rows; then select the critical/high rows by their returned `highest_impact` field. Filtering a single page instead misses low-prevalence critical rules — a critical detection on one endpoint sorts below every widespread low-impact rule. If you deliberately stop paging early, label the detections section of the report as partial. (Do not use the server-side `highest_impact` filter or `sort_by: highest_impact` — they currently return zero rows / mis-ordered results; ENG-3614.)
 
 **Secrets exposure:**
 Call `search_secrets` with `sort_by: severity`, `limit: 10` and read `total_count` for the tenant-wide finding count. Report it as "recorded secret findings" — secret scanning is opt-in per asset, so the absence of findings is not evidence of absence.

@@ -87,7 +87,7 @@ Call `search_detections` filtered by the asset's `platform`:
 
 > **Note:** a `secret_count` of 0 means "no secret findings recorded" — secret scanning is opt-in, so 0 covers both "never scanned" and "scanned, clean". Never report it as "clean".
 
-**AI agent activity:** call `search_ai_sessions` with `hostname` to see AI coding-agent sessions on the asset (agent, classification, severity, detections fired), and `search_ai_security_risks` with `asset_id` for AI-related risk findings. Sessions with critical/high severity detections are an attack-surface dimension the software inventory does not show.
+**AI agent activity:** call `search_ai_sessions` with `asset_id` (exact match — the `hostname` filter is a partial substring match, so "PROD-WEB-01" also returns "PROD-WEB-010"'s sessions) to see AI coding-agent sessions on the asset (agent, classification, severity, detections fired), and `search_ai_security_risks` with `asset_id` for AI-related risk findings. Sessions with critical/high severity detections are an attack-surface dimension the software inventory does not show.
 
 **Unattributed binaries:** call `search_executables` with `is_linked_to_software: false` (optionally `is_signed: "false"`) to surface unlinked executables among the newest ~100 fleet-wide — unsigned, unattributed binaries on a high-importance asset warrant investigation. (Reach caveat: newest ~100 executables only; `sort_by`/`total_count` unreliable until ENG-3606.)
 
@@ -132,7 +132,7 @@ Most `search_*` tools accept asset-scope parameters to answer questions like "as
 | Check network exposure | `search_network_activity` | `software_name` (required), `limit` |
 | Find runtime detections | `search_detections` | `category`, `platform`, `sort_by`, `limit`, `offset` |
 | List secret findings | `search_secrets` | `asset_id`, `severity`, `sort_by`, `limit` |
-| List AI agent sessions | `search_ai_sessions` | `hostname`, `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
+| List AI agent sessions | `search_ai_sessions` | `asset_id` (exact; prefer over substring-matching `hostname`), `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
 | Find AI risk findings | `search_ai_security_risks` | `asset_id`, `severity`, `source`, `limit`, `offset` |
 | Find unattributed binaries | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `limit` (newest ~100; ENG-3606) |
 | View platform inventory | Resource: `spektion://platforms` | N/A |
