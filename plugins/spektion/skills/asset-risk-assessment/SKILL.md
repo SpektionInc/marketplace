@@ -131,7 +131,7 @@ Most `search_*` tools accept asset-scope parameters to answer questions like "as
 | Get software risk profile | `get_software_details` | `software_name` (required) |
 | Check network exposure | `search_network_activity` | `software_name` (required), `limit` |
 | Find runtime detections | `search_detections` | `category`, `platform`, `sort_by`, `limit`, `offset` |
-| List secret findings | `search_secrets` | `asset_id`, `severity`, `sort_by`, `limit` |
+| List secret findings | `search_secrets` | `asset_id`, `detector_name`, `sort_by` (`event_time`/`detector_name`), `limit` |
 | List AI agent sessions | `search_ai_sessions` | `asset_id` (exact; prefer over substring-matching `hostname`), `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
 | Find AI risk findings | `search_ai_security_risks` | `asset_id`, `severity`, `source`, `limit`, `offset` |
 | Find unattributed binaries | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `limit` (newest ~100; ENG-3606) |
