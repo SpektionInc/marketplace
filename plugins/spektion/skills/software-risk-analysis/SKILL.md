@@ -30,10 +30,10 @@ Call `search_software` with `sort_by: detection_count` to find software triggeri
 **By deployment breadth:**
 Call `search_software` with `sort_by: endpoint_count` to find the most widely deployed software.
 
-**By grade:**
-Call `search_software` with `sort_by: grade` to find the worst-graded software products.
+**By score:**
+Call `search_software` with `sort_by: score` to find the worst-scored software products.
 
-For large inventories, use `query_software_inventory` for paginated results with `offset` and `sort` (prefix with `-` for descending, e.g., `-asset_count`).
+For large inventories, page through `search_software` with `offset` (results are capped at 100 per page).
 
 ### Step 2: Deep-Dive Riskiest Products
 
@@ -64,9 +64,17 @@ Call `search_detections` to find detections associated with the software:
 - Filter by `platform` matching the software's platform
 - Look for detections with high `cve_likelihood` (`probability: "high"`) — these indicate the software's behavior patterns resemble CVE exploitation
 - Check categories: `"runtime_weakness"` (insecure configurations), `"exploit_impact"` (observed exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
-- Note: `search_detections` returns `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, and `first_seen` — use `get_software_details` or `query_detection_events` for endpoint/software counts
+- Note: `search_detections` returns `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, `first_seen`, and affected asset/software counts; use `get_detection_events` for the per-software evidence behind a detection
 
-### Step 5: Produce Risk Ranking
+### Step 5: Check Binary-Level Evidence
+
+For risk that software-level views miss, call `search_executables`:
+- `is_linked_to_software: false` — binaries not attributed to any canonical software (shadow IT, droppers, custom tooling)
+- `is_signed: "false"` — unsigned executables
+- Each result includes signing/trust status, asset count, detection categories, and per-detection details (name, category, severity, cve_likelihood)
+- Reach caveat: results cover the newest ~100 executables fleet-wide; `sort_by` and `total_count` are unreliable until ENG-3606 — rank the returned rows by `asset_count` client-side instead
+
+### Step 6: Produce Risk Ranking
 
 Combine all signals into a composite risk ranking:
 
@@ -100,10 +108,10 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 
 | Action | MCP Tool | Key Parameters |
 |--------|----------|----------------|
-| Search software | `search_software` | `name`, `sort_by` (cve_count, endpoint_count, detection_count, grade), `limit` |
+| Search software | `search_software` | `name`, `platform`, `category`, `sort_by` (cve_count, endpoint_count, detection_count, score), `limit`, `offset` |
 | Get software details | `get_software_details` | `software_name` (required) |
-| Paginated software query | `query_software_inventory` | `name`, `platform`, `sort`, `limit`, `offset` |
 | Check network behavior | `search_network_activity` | `software_name` (required), `limit` |
-| Find runtime detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit` |
+| Find runtime detections | `search_detections` | `name`, `category`, `platform`, `sort_by`, `limit`, `offset` |
+| Find risky executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `limit` (newest ~100; ENG-3606) |
 | View categories | Resource: `spektion://software-categories` | N/A |
 | View publishers | Resource: `spektion://software-publishers` | N/A |
