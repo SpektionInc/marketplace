@@ -52,7 +52,13 @@ For detections with high CVE likelihood, call `search_vulnerabilities` to find m
 
 From detection results, identify affected software by the detection's `name` and `platform`. The `search_detections` response includes `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, `first_seen`, and affected asset and software counts.
 
-For the evidence behind a detection — the per-software event log (process path, module, API function, matched outputs) — call `get_detection_events` with the `detection_id` from the search results (or `name` to resolve it). For available mitigations and compensating controls, call `get_detection_controls` with the same `detection_id`.
+For evidence behind a specific runtime detection, call `get_detection_events` with its `detection_id` (or resolve by `name`). Results are software-product groups, not individual events; `total_count` includes one unattributed group when present.
+
+Page only as far as needed with `limit` (default 20, max 100) and `offset` (default 0, max 4294967295). Advance offset by the limit used until `offset + returned` reaches `total_count`; `truncated=true` means groups remain. On an empty page, read `message`: a failed count probe means zero is unknown. Each page recomputes the detection's history, so avoid exhaustive walks unless the question needs them.
+
+`unattributed=true` combines executables not linked to a product, has no `software_id`, and must not be presented as one program. Payload fields summarize latest evidence, while `first_seen` is the earliest group observation; equal latest timestamps can mix fields from different events. Live updates can repeat or skip groups across pages, so a walk is not a snapshot. These rows do not establish raw event frequency, executable counts, or which asset triggered an event.
+
+For available mitigations and compensating controls, call `get_detection_controls` with the same `detection_id`.
 
 To assess the deployment scope of the affected software, call `search_software` or `get_software_details` to understand:
 - Deployment breadth (how many endpoints)
@@ -100,7 +106,7 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 | Action | MCP Tool | Key Parameters |
 |--------|----------|----------------|
 | Search detections | `search_detections` | `name`, `category`, `platform`, `sort_by`, `limit`, `offset` |
-| Get detection evidence | `get_detection_events` | `detection_id` (preferred) or `name`, `limit` |
+| Detection evidence summaries | `get_detection_events` | `detection_id` (preferred) or `name`, `limit` (max 100), `offset` (max 4294967295) |
 | Get mitigations/controls | `get_detection_controls` | `detection_id` (required) |
 | Search matching CVEs | `search_vulnerabilities` | `severity`, `has_remote_exploitability`, `sort_by`, `limit` |
 | Get software details | `get_software_details` | `software_name` (required) |
