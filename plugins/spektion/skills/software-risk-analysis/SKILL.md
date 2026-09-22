@@ -66,6 +66,14 @@ Call `search_detections` to find detections associated with the software:
 - Check categories: `"runtime_weakness"` (insecure configurations), `"exploit_impact"` (observed exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
 - Note: `search_detections` returns `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, `first_seen`, and affected asset/software counts; use `get_detection_events` for the per-software evidence behind a detection
 
+For evidence behind a specific runtime detection, call `get_detection_events` with its `detection_id` (or resolve by `name`). Results are software-product groups, not individual events; `total_count` includes one unattributed group when present.
+
+**Server compatibility:** Paging and the new response fields require a deployed API build containing [spektionapi#373](https://github.com/SpektionInc/spektionapi/pull/373); deterministic ordering of tied groups requires [spektion-analytics#264](https://github.com/SpektionInc/spektion-analytics/pull/264). Before paging, verify that the exposed tool schema declares `offset` and the first response echoes it. If either check fails or cannot be verified, stop after the first page and report that complete enumeration is unavailable. Do not send offsets to an older server: it can ignore them and repeat the first page. On older builds, a zero-UUID `software_id` still represents the combined unattributed group even without `unattributed=true`.
+
+Page only as far as needed with `limit` (default 20, max 100) and `offset` (default 0, max 4294967295). After a nonempty page, advance offset by the limit used until `offset + returned` reaches `total_count`; `truncated=true` means groups remain. Stop advancing on any empty page and read `message` if present: a failed count probe means zero is unknown; a page/count disagreement means live data may have shifted, so restart at offset 0 only if enumeration is still needed. An empty page with `total_count=0` and no message means no groups were found. Each page recomputes the detection's history, so avoid exhaustive walks unless the question needs them.
+
+`unattributed=true` combines executables not linked to a product, has no `software_id`, and must not be presented as one program. Payload fields summarize latest evidence, while `first_seen` is the earliest group observation; equal latest timestamps can mix fields from different events. Live updates can repeat or skip groups across pages, so a walk is not a snapshot. These rows do not establish raw event frequency, executable counts, or which asset triggered an event.
+
 ### Step 5: Check Binary-Level Evidence
 
 For risk that software-level views miss, call `search_executables`:
