@@ -79,10 +79,12 @@ Page only as far as needed with `limit` (default 20, max 100) and `offset` (defa
 For risk that software-level views miss, call `search_executables`:
 - `is_linked_to_software: false` — binaries not attributed to any canonical software (shadow IT, droppers, custom tooling)
 - `is_signed: "false"` — unsigned executables
-
-Both filters run server-side, so `total_count` is the size of the filtered set. Page it with `offset`, advancing by the limit used until `offset + returned` reaches `total_count`, and treat `truncated=true` as "more remain" rather than reading a short page as the end. This needs a server carrying [spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374) and [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261); verify the tool schema declares `offset` and that the first response echoes it, and on an older build stop after one page rather than sending offsets it will ignore — the same gate the asset-risk-assessment skill states in full.
 - Each result includes signing/trust status, asset count, detection categories, and per-detection details (name, category, severity, cve_likelihood)
-- Reach caveat: results cover the newest ~100 executables fleet-wide; `sort_by` and `total_count` are unreliable until ENG-3606 — rank the returned rows by `asset_count` client-side instead
+- `sort_by: asset_count` ranks by deployment breadth across the whole filtered set, so the widest-deployed risky binaries come first rather than the most recently seen
+
+Both filters run server-side, so `total_count` is the size of the filtered set rather than of a sample. Page it with `offset`, advancing by the limit used until `offset + returned` reaches `total_count`, and treat `truncated=true` as "more remain" rather than reading a short page as the end.
+
+**Server compatibility:** paging, a real `total_count` and a working `sort_by` need a server carrying [spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374) and [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261). Verify the tool schema declares `offset` and that the first response echoes it; on an older build stop after one page rather than sending offsets it will ignore, rank the returned rows by `asset_count` client-side, and treat the reach as the newest ~100 executables fleet-wide. The asset-risk-assessment skill states the same gate in full.
 
 ### Step 6: Produce Risk Ranking
 
