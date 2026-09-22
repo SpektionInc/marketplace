@@ -89,7 +89,11 @@ Call `search_detections` filtered by the asset's `platform`:
 
 **AI agent activity:** call `search_ai_sessions` with `asset_id` (exact match — the `hostname` filter is a partial substring match, so "PROD-WEB-01" also returns "PROD-WEB-010"'s sessions) to see AI coding-agent sessions on the asset (agent, classification, severity, detections fired), and `search_ai_security_risks` with `asset_id` for AI-related risk findings. Sessions with critical/high severity detections are an attack-surface dimension the software inventory does not show.
 
-**Unattributed binaries:** call `search_executables` with `is_linked_to_software: false` (optionally `is_signed: "false"`) to surface unlinked executables among the newest ~100 fleet-wide — unsigned, unattributed binaries on a high-importance asset warrant investigation. (Reach caveat: newest ~100 executables only; `sort_by`/`total_count` unreliable until ENG-3606.)
+**Unattributed binaries:** call `search_executables` with `is_linked_to_software: false` (optionally `is_signed: "false"`) to surface unlinked executables — unsigned, unattributed binaries on a high-importance asset warrant investigation. Both filters run server-side, so `total_count` describes the filtered set rather than a sample of it.
+
+Page with `limit` (default 20, max 100) and `offset` (default 0). Advance offset by the limit used until `offset + returned` reaches `total_count`; `truncated=true` means executables remain. Do **not** stop because a page returned fewer items than the limit — `returned` counts the rows left after software-linkage filtering, so a short page can still be followed by more. Ordering is stable across pages (every order is broken by hash), so a walk neither repeats nor skips.
+
+**Server compatibility:** `offset`, a real `total_count` and a working `sort_by` require a deployed API build containing [spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374) and [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261). Before paging, verify that the exposed tool schema declares `offset` and that the first response echoes it. If either check fails or cannot be verified, stop after the first page and report that complete enumeration is unavailable. Do not send offsets to an older server: it ignores them and repeats the first page. A response carrying `total_count_unavailable: true` IS that older server — its items are correct, so page on `truncated` alone, and never read a `total_count` of 0 from it as an empty inventory. On an older build the reach is the newest ~100 executables fleet-wide, and `sort_by` is inert.
 
 ### Step 6: Evaluate Business Impact
 
@@ -134,5 +138,5 @@ Most `search_*` tools accept asset-scope parameters to answer questions like "as
 | List secret findings | `search_secrets` | `asset_id`, `detector_name`, `sort_by` (`event_time`/`detector_name`) — `detector_name` filter/sort need server ≥ 2026-09-15 (ENG-3617), `limit` |
 | List AI agent sessions | `search_ai_sessions` | `asset_id` (exact; prefer over substring-matching `hostname`), `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
 | Find AI risk findings | `search_ai_security_risks` | `asset_id`, `severity`, `source`, `limit`, `offset` |
-| Find unattributed binaries | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `limit` (newest ~100; ENG-3606) |
+| Find unattributed binaries | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit`, `offset` — paging and `total_count` need a server carrying spektionapi#374 (see Server compatibility above) |
 | View platform inventory | Resource: `spektion://platforms` | N/A |
