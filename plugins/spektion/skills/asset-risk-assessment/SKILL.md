@@ -95,7 +95,15 @@ Page with `limit` (default 20, max 100) and `offset` (default 0). Advance offset
 
 **Dedupe by hash, and report the distinct count.** Ordering is total within one snapshot of the list, but the list is rebuilt every 15 minutes (a scoped list is computed live and can move between any two pages), and a walk that crosses a rebuild can both repeat and skip rows: newly seen executables enter at the head of the default order and push unvisited ones past the offset already reached. The two cancel out, so the rows collected still equal `total_count` even when some are missing — that arithmetic is not evidence of completeness. Prefer the default order for an exhaustive walk; `sort_by=last_seen` re-ranks every recently active executable to the head at each rebuild, so treat it and `asset_count` as ways to see the top of a ranking rather than all of it.
 
-**Server compatibility:** `offset`, a real `total_count` and a working `sort_by` require a deployed API build containing [spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374) and [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261). Before paging, verify that the exposed tool schema declares `offset` and that the first response echoes it. If either check fails or cannot be verified, stop after the first page and report that complete enumeration is unavailable. Do not send offsets to an older server: it ignores them and repeats the first page. A response carrying `total_count_unavailable: true` IS that older server — its items are correct, so page on `truncated` alone, and never read a `total_count` of 0 from it as an empty inventory. On an older build the reach is the newest ~100 executables fleet-wide, and `sort_by` is inert.
+**Server compatibility.** Two halves deploy independently ([spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374) and [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261)), and they fail in **different** ways. Check both.
+
+**Is the API new?** The exposed tool schema declares `offset`, and the first response echoes `offset` and `limit`. If not, this build cannot page: the reach is the newest ~100 executables fleet-wide, `sort_by` is inert, and an offset it never declared is ignored, so asking for one returns the first page again. Stop after one page and say that complete enumeration is unavailable — never present a repeated first page as further results.
+
+**Is analytics new?** The response does **not** carry `total_count_unavailable: true`. If it does, paging still works — keep advancing `offset` while `truncated` is present — but the server applied **none** of `platform`, `is_signed` or `sort_by`. Only `is_linked_to_software` was honoured, and the API filtered it after the fact rather than in the query. In that state:
+
+- **Re-check `is_signed` and `platform` on every returned row yourself** and discard the ones that do not match what you asked for. Trusting them is how a signed binary gets reported as unsigned — the exact mistake this step exists to avoid.
+- Treat any ranking as arrival order, not as `sort_by`. Do not describe results as "most widespread".
+- `total_count` is absent, not zero. Never read its absence as an empty inventory, and give a count only for what you actually collected and deduped.
 
 ### Step 6: Evaluate Business Impact
 
