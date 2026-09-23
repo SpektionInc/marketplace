@@ -80,7 +80,11 @@ For risk that software-level views miss, call `search_executables`:
 - `is_linked_to_software: false` — binaries not attributed to any canonical software (shadow IT, droppers, custom tooling)
 - `is_signed: "false"` — unsigned executables
 - Each result includes signing/trust status, asset count, detection categories, and per-detection details (name, category, severity, cve_likelihood)
-- Reach caveat: results cover the newest ~100 executables fleet-wide; `sort_by` and `total_count` are unreliable until ENG-3606 — rank the returned rows by `asset_count` client-side instead
+- `sort_by: asset_count` ranks by deployment breadth across the whole filtered set, so the widest-deployed risky binaries come first rather than the most recently seen
+
+Both filters run server-side, so `total_count` is the size of the filtered set rather than of a sample. Page it with `offset`, advancing by the **echoed** `limit` (a larger request is clamped to `max_limit`) until `offset + returned` reaches `total_count`, and treat `truncated=true` as "more remain" rather than reading a short page as the end. Dedupe by hash: the list is rebuilt every 15 minutes, and a walk crossing a rebuild can repeat and skip rows while still collecting exactly `total_count` of them, so the count alone does not prove the walk was complete.
+
+**Server compatibility.** The two halves ([spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374), [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261)) deploy independently and fail differently. If the tool schema does not declare `offset`, this build cannot page — the reach is the newest ~100 executables fleet-wide, `sort_by` is inert, so rank what you got by `asset_count` client-side and say enumeration is unavailable. If instead the response carries `total_count_unavailable: true`, paging works but the server applied **neither** `is_signed` nor `platform` nor the sort — only `is_linked_to_software`, and that after the fact — so re-check signing and platform on each row before calling anything unsigned, and do not present the order as a ranking. The asset-risk-assessment skill states both cases in full.
 
 ### Step 6: Produce Risk Ranking
 
@@ -120,6 +124,6 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 | Get software details | `get_software_details` | `software_name` (required) |
 | Check network behavior | `search_network_activity` | `software_name` (required), `limit` |
 | Find runtime detections | `search_detections` | `name`, `category`, `platform`, `sort_by`, `limit`, `offset` |
-| Find risky executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `limit` (newest ~100; ENG-3606) |
+| Find risky executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit`, `offset` — paging and `total_count` need a server carrying spektionapi#374 |
 | View categories | Resource: `spektion://software-categories` | N/A |
 | View publishers | Resource: `spektion://software-publishers` | N/A |
