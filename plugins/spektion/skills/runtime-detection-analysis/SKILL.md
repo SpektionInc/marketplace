@@ -29,15 +29,12 @@ Spektion detections are **runtime behavioral observations** — distinct from CV
 ### Step 1: Discover Active Detections
 
 Call `search_detections` to find current behavioral detections:
-- `highest_impact: critical` — start with the most severe detections
+- `sort_by: endpoint_count` — start with the most widespread detections, then triage by the `highest_impact` field on the returned rows (critical/high first)
 - `platform`: filter to a specific OS if needed
 - `category`: filter by detection type
-- `sort_by: highest_impact` — find the most impactful detections first
-- `limit`: up to 100 results
+- `limit`: up to 100 results, with `offset` for pagination
 
-For large datasets, use `query_detection_events` for paginated results with `offset` and `sort`.
-
-Review the detection rule library for context: read resource `spektion://detection-rules`.
+> **Note:** do not use the server-side `highest_impact` filter or `sort_by: highest_impact` — they currently return zero rows / mis-ordered results for every documented value (ENG-3614). Triage impact client-side from the returned `highest_impact` field instead.
 
 ### Step 2: Analyze CVE Correlation
 
@@ -53,9 +50,19 @@ For detections with high CVE likelihood, call `search_vulnerabilities` to find m
 
 ### Step 3: Identify Affected Software
 
-From detection results, identify affected software by the detection's `name` and `platform`. The `search_detections` response includes `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, and `first_seen` — but does not include software or endpoint counts directly.
+From detection results, identify affected software by the detection's `name` and `platform`. The `search_detections` response includes `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, `first_seen`, and affected asset and software counts.
 
-To assess the scope of a detection, call `search_software` or `get_software_details` for the associated software to understand:
+For evidence behind a specific runtime detection, call `get_detection_events` with its `detection_id` (or resolve by `name`). Results are software-product groups, not individual events; `total_count` includes one unattributed group when present.
+
+**Server compatibility:** Paging and the new response fields require a deployed API build containing [spektionapi#373](https://github.com/SpektionInc/spektionapi/pull/373); deterministic ordering of tied groups requires [spektion-analytics#264](https://github.com/SpektionInc/spektion-analytics/pull/264). Before paging, verify that the exposed tool schema declares `offset` and the first response echoes it. If either check fails or cannot be verified, stop after the first page and report that complete enumeration is unavailable. Do not send offsets to an older server: it can ignore them and repeat the first page. On older builds, a zero-UUID `software_id` still represents the combined unattributed group even without `unattributed=true`.
+
+Page only as far as needed with `limit` (default 20, max 100) and `offset` (default 0, max 4294967295). After a nonempty page, advance offset by the limit used until `offset + returned` reaches `total_count`; `truncated=true` means groups remain. Stop advancing on any empty page and read `message` if present: a failed count probe means zero is unknown; a page/count disagreement means live data may have shifted, so restart at offset 0 only if enumeration is still needed. An empty page with `total_count=0` and no message means no groups were found. Each page recomputes the detection's history, so avoid exhaustive walks unless the question needs them.
+
+`unattributed=true` combines executables not linked to a product, has no `software_id`, and must not be presented as one program. Payload fields summarize latest evidence, while `first_seen` is the earliest group observation; equal latest timestamps can mix fields from different events. Live updates can repeat or skip groups across pages, so a walk is not a snapshot. These rows do not establish raw event frequency, executable counts, or which asset triggered an event.
+
+For available mitigations and compensating controls, call `get_detection_controls` with the same `detection_id`.
+
+To assess the deployment scope of the affected software, call `search_software` or `get_software_details` to understand:
 - Deployment breadth (how many endpoints)
 - Business impact tiers of affected endpoints
 - Whether the software also has known CVEs
@@ -65,9 +72,7 @@ To assess the scope of a detection, call `search_software` or `get_software_deta
 
 ### Step 4: Map Endpoint Impact
 
-To assess endpoint impact, use `search_endpoints` sorted by `risk_count` or `cve_count` to find the highest-risk endpoints on the affected platform. For critical endpoints, call `get_endpoint_details` to understand the full risk context.
-
-> **Note:** `search_detections` does not return endpoint counts directly. Use `search_endpoints` filtered by platform to identify affected endpoints, or use `query_detection_events` which returns `asset_count` and `software_count` per detection.
+Each `search_detections` row carries the affected asset count. To find the highest-risk assets on the affected platform, use `search_assets` sorted by `detection_count` or `cve_count`; each returned asset includes a `risks` array (risk_id, risk_name, category). Read that array as **risks associated with the asset's installed software**, not as observed behavior: an asset inherits a detection when any asset shares the same canonical software, even if it never triggered the detection itself. Do not claim a specific asset exhibited the behavior — `get_detection_events` evidence is per-software and fleet-wide, so asset-level observation is not available from this surface; attribute behavior to the software, and to assets only as "at risk via installed software". For critical assets, call `get_asset_details` with the exact hostname to understand the full risk context.
 
 ### Step 5: Check Network Context
 
@@ -102,10 +107,11 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 
 | Action | MCP Tool | Key Parameters |
 |--------|----------|----------------|
-| Search detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit` |
-| Paginated detection query | `query_detection_events` | `category`, `severity`, `platform`, `name`, `sort`, `limit`, `offset` |
+| Search detections | `search_detections` | `name`, `category`, `platform`, `sort_by`, `limit`, `offset` |
+| Detection evidence summaries | `get_detection_events` | `detection_id` (preferred) or `name`, `limit` (max 100), `offset` (max 4294967295) |
+| Get mitigations/controls | `get_detection_controls` | `detection_id` (required) |
 | Search matching CVEs | `search_vulnerabilities` | `severity`, `has_remote_exploitability`, `sort_by`, `limit` |
 | Get software details | `get_software_details` | `software_name` (required) |
 | Check network activity | `search_network_activity` | `software_name` (required), `limit` |
-| Get endpoint details | `get_endpoint_details` | `hostname` (required) |
-| View detection rules | Resource: `spektion://detection-rules` | N/A |
+| Find affected assets | `search_assets` | `hostname`, `platform`, `sort_by`, `limit` |
+| Get asset details | `get_asset_details` | `hostname` (required, exact) |

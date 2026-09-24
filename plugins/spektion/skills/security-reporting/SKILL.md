@@ -69,7 +69,16 @@ Call `search_vulnerabilities` with `kev: true`, `sort_by: epss_score`, `limit: 1
 Call `search_software` with `sort_by: cve_count`, `limit: 10`.
 
 **Runtime detections:**
-Call `search_detections` with `highest_impact: critical`, `sort_by: highest_impact`, `limit: 10`.
+Call `search_detections` with `sort_by: endpoint_count`, `limit: 100`, and page by advancing `offset` by the requested page size (0, 100, 200, …) until `offset` reaches the `total_count` reported by the **first** page (read it once at `offset: 0` — a page past the end reports `total_count: 0`, so don't re-read it from later pages); then select the critical/high rows by their returned `highest_impact` field. Do **not** stop on a page that returns fewer than `limit` rows: disabled rules are dropped server-side *after* backend pagination, so a mid-range page can come back short while later pages still hold matches (`total_count` counts backend matches before that drop, which makes it the correct stop signal — it can only over-extend paging, never truncate it). Filtering a single page instead misses low-prevalence critical rules — a critical detection on one endpoint sorts below every widespread low-impact rule. If you deliberately stop paging early, label the detections section of the report as partial. (Do not use the server-side `highest_impact` filter or `sort_by: highest_impact` — they currently return zero rows / mis-ordered results; ENG-3614.)
+
+**Secrets exposure:**
+Call `search_secrets` with `sort_by: detector_name`, `limit: 100` and read `total_count` for the tenant-wide finding count; describe the kinds of secrets from the returned `detector_name` values ("SSH Private Key", "JWT Token", "AWS Secret Access Key", …). Do not filter or rank by `severity` — on current-scanner findings it is a constant wrapper value, the tool has no severity filter, and a passed one is ignored rather than rejected. There is no `offset`, so when `total_count` exceeds the returned rows, present the rows as a sample of `total_count`, never as the full set. Report it as "recorded secret findings" — secret scanning is opt-in per asset, so the absence of findings is not evidence of absence. *(The `detector_name` filter and `sort_by: detector_name` require a server build newer than 2026-09-15 — ENG-3617; on older builds omit them, keep the default `event_time` sort, and read each finding's detector from `outputs.name`.)*
+
+**AI agent activity:**
+Call `count_ai_session_detections` (with `recency_days: 30` for a current view) for a census of AI-session detections by rule, then `search_ai_sessions` with `severity: critical` or `high` and the same `recency_days` for the sessions behind them. Call `search_ai_security_risks` for AI-related risk findings outside sessions. *(`count_ai_session_detections` requires a server build newer than 2026-09; if it is not in your tool list, use `search_ai_sessions` alone.)*
+
+**SLA context:**
+Read the server-computed `sla_status` field on `search_vulnerabilities` results to report overdue vs within-SLA per CVE. (`get_tenant_settings` currently returns a placeholder message, not the SLA policy — do not source thresholds from it.)
 
 ### Step 4: Synthesize Report
 
@@ -114,6 +123,9 @@ Structure the report based on audience:
 ## Runtime Detection Activity
 [Critical/high detections by category (`runtime_weakness`, `exploit_impact`, `remotely_exploitable`), CVE correlation via `cve_likelihood`, affected scope]
 
+## Secrets & AI Agent Activity
+[Recorded secret findings by detector type (`detector_name`); AI session counts, detection census, critical/high sessions]
+
 ## Action Items
 [Prioritized list with specific CVEs, software, endpoints to address]
 ```
@@ -136,5 +148,10 @@ Include the vulnerability delta from trends data to show if the backlog is growi
 | Get vulnerability trends | `get_vulnerability_trends` | `severity`, `platform`, `start_time`, `end_time` |
 | Search critical CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by`, `limit` |
 | Search risky software | `search_software` | `sort_by: cve_count`, `limit` |
-| Search detections | `search_detections` | `highest_impact`, `sort_by: highest_impact`, `limit` |
+| Search detections | `search_detections` | `sort_by: endpoint_count`, `limit` (impact triage client-side — ENG-3614) |
+| Count secret findings | `search_secrets` | `detector_name`, `sort_by` (`event_time`/`detector_name`) — both server ≥ 2026-09-15, ENG-3617; `limit` (read `total_count`; no `offset` — rows beyond `limit` are unreachable, label as a sample) |
+| AI detection census | `count_ai_session_detections` | `severity`, `recency_days` |
+| Search AI sessions | `search_ai_sessions` | `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
+| Search AI risk findings | `search_ai_security_risks` | `severity`, `source`, `limit`, `offset` |
+| Per-CVE SLA status | `search_vulnerabilities` | read `sla_status` on results (`get_tenant_settings` is a placeholder today) |
 | View platforms | Resource: `spektion://platforms` | N/A |

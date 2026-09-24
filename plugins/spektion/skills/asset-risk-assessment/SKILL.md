@@ -19,31 +19,32 @@ You are a vulnerability analyst performing endpoint risk assessment using Spekti
 
 ### Step 1: Identify Target Assets
 
-**For a specific endpoint:**
-Call `get_endpoint_details` with the `hostname` parameter to retrieve:
+**For a specific asset:**
+Call `get_asset_details` with the `hostname` parameter (exact hostname, case-insensitive — use `search_assets` first to resolve it) to retrieve:
 - Hostname, IP address, OS, platform, domain
-- Security grade and score
-- Business impact tier (`importance`)
+- Exposure score (0-100, higher = more exposed) and exposure severity (CRITICAL/HIGH/MEDIUM/LOW)
+- Business impact tier (`importance`: 1=critical … 5=minimal, null=unassigned)
 - Online status and last seen timestamp
 - All installed software with grades and versions
-- Network activity (flat list of connections with `is_internal` classification)
-- Software count, risk count, CVE count
+- Network activity (software_name, destination, activity, observation_count, `is_internal`)
+- Runtime risks array, plus software/detection/CVE/executable counts
+- `secret_count` and `secret_types` — findings from the asset's latest secret scan (see Step 5)
 
-> **Note:** The `get_endpoint_details` response can be very large (80KB+) because it includes full `network_activity` and `installed_software` lists. For network analysis, prefer using `search_network_activity` separately rather than relying on the embedded data.
+> **Note:** The `get_asset_details` response can be very large because it includes full network activity and installed software lists. For network analysis, prefer using `search_network_activity` separately rather than relying on the embedded data.
 
-**For endpoint discovery:**
-Call `search_endpoints` with filters:
+**For asset discovery:**
+Call `search_assets` with filters:
 - `hostname`: substring match to find hosts
 - `platform`: windows, macos, or linux
 - `is_online`: true/false for online status
-- `sort_by`: risk_count, cve_count, score, software_count, last_seen
+- `sort_by`: last_seen (oldest first), or cve_count, detection_count, software_count, exposure_score (descending)
 - `limit`: up to 100 results
 
 For large inventories, use `query_sensors` for paginated results with `offset`.
 
 ### Step 2: Analyze Installed Software Risk
 
-From the endpoint details, examine `installed_software`:
+From the asset details, examine `installed_software`:
 1. **Poor grades** (D, F) — software with known vulnerabilities or runtime weaknesses. Grade and score are the primary risk indicators.
 2. **Unused software** — installed but not actively used (`used: false`) — unnecessary attack surface
 3. **Missing updates** — check version information for outdated releases
@@ -70,25 +71,49 @@ For software that makes network connections, call `search_network_activity` with
 **Port bindings** (`listeners` array):
 - `ip_address` and `port` — which software is listening on network ports (potential entry points)
 
-> **Note:** `get_endpoint_details` also includes a `network_activity` flat list, but it only contains outbound connections (no listener data) and can be very large (1000+ entries). Use `search_network_activity` for targeted analysis including listener/port binding data.
+> **Note:** `get_asset_details` also includes a `network_activity` flat list, but it can be very large (1000+ entries). Use `search_network_activity` for targeted analysis including listener/port binding data.
 
 ### Step 4: Check Runtime Detections
 
-Call `search_detections` filtered by the endpoint's `platform`:
-- Look for detections with `highest_impact` of critical or high
+Call `search_detections` filtered by the asset's `platform`:
+- Look for detections with `highest_impact` of critical or high in the returned rows (triage client-side; the server-side `highest_impact` filter currently returns zero rows — ENG-3614)
 - Check categories: `"runtime_weakness"` (insecure configurations), `"exploit_impact"` (exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
 - Review `cve_likelihood` (`probability`: `"high"`, `"medium"`, or `"low"` and `description`) to connect behavioral detections to potential CVE exploitation
 - To assess spread of a specific detection, use `get_software_details` or `search_software` for the associated software to get endpoint and software counts
 
-### Step 5: Evaluate Business Impact
+### Step 5: Check Secrets and AI Activity Exposure
 
-Combine findings with the endpoint's business context:
-1. **Importance tier** — from endpoint details, determines remediation urgency
+**Secrets:** from the asset details, read `secret_count` and `secret_types` (deduplicated detector names like "SSH Private Key", "JWT Token"). A positive `secret_count` with an empty `secret_types` is a real state — every finding came from a detector that reports no name — not a contradiction and not a clean asset. For the individual findings and their file locations, call `search_secrets` with `asset_id` (the `asset_id` field from the asset details, not the hostname) and read `total_count`.
+
+> **Note:** a `secret_count` of 0 means "no secret findings recorded" — secret scanning is opt-in, so 0 covers both "never scanned" and "scanned, clean". Never report it as "clean".
+
+**AI agent activity:** call `search_ai_sessions` with `asset_id` (exact match — the `hostname` filter is a partial substring match, so "PROD-WEB-01" also returns "PROD-WEB-010"'s sessions) to see AI coding-agent sessions on the asset (agent, classification, severity, detections fired), and `search_ai_security_risks` with `asset_id` for AI-related risk findings. Sessions with critical/high severity detections are an attack-surface dimension the software inventory does not show.
+
+**Unattributed binaries:** call `search_executables` with `is_linked_to_software: false` (optionally `is_signed: "false"`) to surface unlinked executables — unsigned, unattributed binaries on a high-importance asset warrant investigation. Both filters run server-side, so `total_count` describes the filtered set rather than a sample of it.
+
+Page with `limit` (default 20, max 100) and `offset` (default 0). Advance offset by the **echoed** `limit` — a larger request is clamped to `max_limit` and advancing by what you asked for skips the difference every page — until `offset + returned` reaches `total_count`; `truncated=true` means executables remain. Do **not** stop because a page returned fewer items than the limit — `returned` counts the rows left after software-linkage filtering, so a short page can still be followed by more.
+
+**Dedupe by hash, and report the distinct count.** Ordering is total within one snapshot of the list, but the list is rebuilt every 15 minutes (a scoped list is computed live and can move between any two pages), and a walk that crosses a rebuild can both repeat and skip rows: newly seen executables enter at the head of the default order and push unvisited ones past the offset already reached. The two cancel out, so the rows collected still equal `total_count` even when some are missing — that arithmetic is not evidence of completeness. Prefer the default order for an exhaustive walk; `sort_by=last_seen` re-ranks every recently active executable to the head at each rebuild, so treat it and `asset_count` as ways to see the top of a ranking rather than all of it.
+
+**Server compatibility.** Two halves deploy independently ([spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374) and [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261)), and they fail in **different** ways. Check both.
+
+**Is the API new?** The exposed tool schema declares `offset`, and the first response echoes `offset` and `limit`. If not, this build cannot page: the reach is the newest ~100 executables fleet-wide, `sort_by` is inert, and an offset it never declared is ignored, so asking for one returns the first page again. Stop after one page and say that complete enumeration is unavailable — never present a repeated first page as further results.
+
+**Is analytics new?** The response does **not** carry `total_count_unavailable: true`. If it does, paging still works — keep advancing `offset` while `truncated` is present — but the server applied **none** of `platform`, `is_signed` or `sort_by`. Only `is_linked_to_software` was honoured, and the API filtered it after the fact rather than in the query. In that state:
+
+- **Re-check `is_signed` and `platform` on every returned row yourself** and discard the ones that do not match what you asked for. Trusting them is how a signed binary gets reported as unsigned — the exact mistake this step exists to avoid.
+- Treat any ranking as arrival order, not as `sort_by`. Do not describe results as "most widespread".
+- `total_count` is absent, not zero. Never read its absence as an empty inventory, and give a count only for what you actually collected and deduped.
+
+### Step 6: Evaluate Business Impact
+
+Combine findings with the asset's business context:
+1. **Importance tier** — from asset details, determines remediation urgency
 2. **Grade justification** — explain why the grade is what it is (CVE count, detection count, software risk)
 3. **Attack surface score** — internet-facing services + elevated-privilege software + unpatched CVEs + runtime detections
 4. **Lateral movement risk** — network connections to/from other internal assets
 
-### Step 6: Produce Recommendations
+### Step 7: Produce Recommendations
 
 Deliver a structured assessment:
 1. **Risk summary** — one-paragraph overall risk posture
@@ -106,14 +131,22 @@ If the `mallory-api` skill is available in this session:
 
 If not available, proceed with Spektion data only. All enrichment is additive, not required.
 
+## Scoping to a Fleet Subset
+
+Most `search_*` tools accept asset-scope parameters to answer questions like "assess my production servers": `asset_tags` (tag names as the user says them, e.g. "Production", "PCI"), `asset_importance` (Business Impact tiers 1=critical … 5=minimal), and `asset_type` (workstation or server). Each has an `_op` companion (`equals`/`notEqual`). Exceptions: `search_secrets`, `search_ai_security_risks`, and `search_network_activity` do not accept scope parameters — do not pass them there, since results would come back unscoped.
+
 ## Quick Reference
 
 | Action | MCP Tool | Key Parameters |
 |--------|----------|----------------|
-| Get endpoint profile | `get_endpoint_details` | `hostname` (required) |
-| Search endpoints | `search_endpoints` | `hostname`, `platform`, `is_online`, `sort_by`, `limit` |
-| Paginated endpoint query | `query_sensors` | `hostname`, `os_family`, `importance`, `enabled`, `sort`, `limit`, `offset` |
+| Get asset profile | `get_asset_details` | `hostname` (required, exact) |
+| Search assets | `search_assets` | `hostname`, `platform`, `is_online`, `sort_by`, `limit` |
+| Paginated sensor query | `query_sensors` | `hostname`, `os_family`, `importance`, `enabled`, `sort`, `limit`, `offset` |
 | Get software risk profile | `get_software_details` | `software_name` (required) |
 | Check network exposure | `search_network_activity` | `software_name` (required), `limit` |
-| Find runtime detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit` |
+| Find runtime detections | `search_detections` | `category`, `platform`, `sort_by`, `limit`, `offset` |
+| List secret findings | `search_secrets` | `asset_id`, `detector_name`, `sort_by` (`event_time`/`detector_name`) — `detector_name` filter/sort need server ≥ 2026-09-15 (ENG-3617), `limit` |
+| List AI agent sessions | `search_ai_sessions` | `asset_id` (exact; prefer over substring-matching `hostname`), `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
+| Find AI risk findings | `search_ai_security_risks` | `asset_id`, `severity`, `source`, `limit`, `offset` |
+| Find unattributed binaries | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit`, `offset` — paging and `total_count` need a server carrying spektionapi#374 (see Server compatibility above) |
 | View platform inventory | Resource: `spektion://platforms` | N/A |

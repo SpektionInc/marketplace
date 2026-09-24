@@ -30,10 +30,10 @@ Call `search_software` with `sort_by: detection_count` to find software triggeri
 **By deployment breadth:**
 Call `search_software` with `sort_by: endpoint_count` to find the most widely deployed software.
 
-**By grade:**
-Call `search_software` with `sort_by: grade` to find the worst-graded software products.
+**By score:**
+Call `search_software` with `sort_by: score` to find the worst-scored software products.
 
-For large inventories, use `query_software_inventory` for paginated results with `offset` and `sort` (prefix with `-` for descending, e.g., `-asset_count`).
+For large inventories, page through `search_software` with `offset` (results are capped at 100 per page).
 
 ### Step 2: Deep-Dive Riskiest Products
 
@@ -64,9 +64,29 @@ Call `search_detections` to find detections associated with the software:
 - Filter by `platform` matching the software's platform
 - Look for detections with high `cve_likelihood` (`probability: "high"`) — these indicate the software's behavior patterns resemble CVE exploitation
 - Check categories: `"runtime_weakness"` (insecure configurations), `"exploit_impact"` (observed exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
-- Note: `search_detections` returns `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, and `first_seen` — use `get_software_details` or `query_detection_events` for endpoint/software counts
+- Note: `search_detections` returns `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, `first_seen`, and affected asset/software counts; use `get_detection_events` for the per-software evidence behind a detection
 
-### Step 5: Produce Risk Ranking
+For evidence behind a specific runtime detection, call `get_detection_events` with its `detection_id` (or resolve by `name`). Results are software-product groups, not individual events; `total_count` includes one unattributed group when present.
+
+**Server compatibility:** Paging and the new response fields require a deployed API build containing [spektionapi#373](https://github.com/SpektionInc/spektionapi/pull/373); deterministic ordering of tied groups requires [spektion-analytics#264](https://github.com/SpektionInc/spektion-analytics/pull/264). Before paging, verify that the exposed tool schema declares `offset` and the first response echoes it. If either check fails or cannot be verified, stop after the first page and report that complete enumeration is unavailable. Do not send offsets to an older server: it can ignore them and repeat the first page. On older builds, a zero-UUID `software_id` still represents the combined unattributed group even without `unattributed=true`.
+
+Page only as far as needed with `limit` (default 20, max 100) and `offset` (default 0, max 4294967295). After a nonempty page, advance offset by the limit used until `offset + returned` reaches `total_count`; `truncated=true` means groups remain. Stop advancing on any empty page and read `message` if present: a failed count probe means zero is unknown; a page/count disagreement means live data may have shifted, so restart at offset 0 only if enumeration is still needed. An empty page with `total_count=0` and no message means no groups were found. Each page recomputes the detection's history, so avoid exhaustive walks unless the question needs them.
+
+`unattributed=true` combines executables not linked to a product, has no `software_id`, and must not be presented as one program. Payload fields summarize latest evidence, while `first_seen` is the earliest group observation; equal latest timestamps can mix fields from different events. Live updates can repeat or skip groups across pages, so a walk is not a snapshot. These rows do not establish raw event frequency, executable counts, or which asset triggered an event.
+
+### Step 5: Check Binary-Level Evidence
+
+For risk that software-level views miss, call `search_executables`:
+- `is_linked_to_software: false` — binaries not attributed to any canonical software (shadow IT, droppers, custom tooling)
+- `is_signed: "false"` — unsigned executables
+- Each result includes signing/trust status, asset count, detection categories, and per-detection details (name, category, severity, cve_likelihood)
+- `sort_by: asset_count` ranks by deployment breadth across the whole filtered set, so the widest-deployed risky binaries come first rather than the most recently seen
+
+Both filters run server-side, so `total_count` is the size of the filtered set rather than of a sample. Page it with `offset`, advancing by the **echoed** `limit` (a larger request is clamped to `max_limit`) until `offset + returned` reaches `total_count`, and treat `truncated=true` as "more remain" rather than reading a short page as the end. Dedupe by hash: the list is rebuilt every 15 minutes, and a walk crossing a rebuild can repeat and skip rows while still collecting exactly `total_count` of them, so the count alone does not prove the walk was complete.
+
+**Server compatibility.** The two halves ([spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374), [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261)) deploy independently and fail differently. If the tool schema does not declare `offset`, this build cannot page — the reach is the newest ~100 executables fleet-wide, `sort_by` is inert, so rank what you got by `asset_count` client-side and say enumeration is unavailable. If instead the response carries `total_count_unavailable: true`, paging works but the server applied **neither** `is_signed` nor `platform` nor the sort — only `is_linked_to_software`, and that after the fact — so re-check signing and platform on each row before calling anything unsigned, and do not present the order as a ranking. The asset-risk-assessment skill states both cases in full.
+
+### Step 6: Produce Risk Ranking
 
 Combine all signals into a composite risk ranking:
 
@@ -100,10 +120,10 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 
 | Action | MCP Tool | Key Parameters |
 |--------|----------|----------------|
-| Search software | `search_software` | `name`, `sort_by` (cve_count, endpoint_count, detection_count, grade), `limit` |
+| Search software | `search_software` | `name`, `platform`, `category`, `sort_by` (cve_count, endpoint_count, detection_count, score), `limit`, `offset` |
 | Get software details | `get_software_details` | `software_name` (required) |
-| Paginated software query | `query_software_inventory` | `name`, `platform`, `sort`, `limit`, `offset` |
 | Check network behavior | `search_network_activity` | `software_name` (required), `limit` |
-| Find runtime detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit` |
+| Find runtime detections | `search_detections` | `name`, `category`, `platform`, `sort_by`, `limit`, `offset` |
+| Find risky executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit`, `offset` — paging and `total_count` need a server carrying spektionapi#374 |
 | View categories | Resource: `spektion://software-categories` | N/A |
 | View publishers | Resource: `spektion://software-publishers` | N/A |

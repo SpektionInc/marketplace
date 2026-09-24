@@ -32,25 +32,31 @@ Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) or your project's `.en
 
 ## What You Get
 
-### 16 MCP Tools (Native Access)
+### 24 MCP Tools (Native Access)
 
 Once installed, Claude can directly call these Spektion tools:
 
 | Category | Tools |
 |----------|-------|
-| **Search** | `search_vulnerabilities`, `search_endpoints`, `search_software`, `search_detections`, `search_network_activity` |
-| **Details** | `get_vulnerability_details`, `get_endpoint_details`, `get_software_details` |
+| **Search** | `search_assets`, `search_vulnerabilities`, `search_software`, `search_detections`, `search_executables`, `search_secrets`, `count_secrets_by_detector`*, `search_network_activity` |
+| **Details** | `get_asset_details`, `get_asset_executables`*, `get_executable_details`*, `get_vulnerability_details`, `get_software_details`, `get_detection_events`, `get_detection_controls` |
+| **AI Security** | `search_ai_sessions`, `search_ai_security_risks`, `count_ai_session_detections`*, `get_ai_session_artifacts`* |
 | **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` |
-| **Paginated Queries** | `query_sensors`, `query_software_inventory`, `query_detection_events`, `query_vulnerability_data` |
+| **Sensors** | `query_sensors` |
 
-### 4 Resources
+\* Tools are served live by the MCP server, so the newest ones appear only on recent builds. `count_ai_session_detections` needs a build from 2026-09-09; `get_ai_session_artifacts` one from 2026-09-15; `count_secrets_by_detector` from 2026-09-17; and `get_asset_executables` and `get_executable_details` from 2026-09-24, when they were promoted from the chat-only surface. An older deployment simply lists fewer than 24 tools — nothing else changes, and the skills degrade to the tools that are present.
+
+Most `search_*` tools accept asset-scope parameters (`asset_tags`, `asset_importance`, `asset_type`) to scope any question to a subset of the fleet — e.g. "critical CVEs on my production servers".
+
+### 5 Resources
 
 | Resource | Description |
 |----------|-------------|
 | `spektion://platforms` | Active platforms with endpoint counts |
 | `spektion://software-categories` | Software category taxonomy |
 | `spektion://software-publishers` | Publisher list |
-| `spektion://detection-rules` | Detection rule library |
+| `spektion://detection-rules` | Detection rule index (use `search_detections` for queries) |
+| `spektion://sla-policy` | SLA remediation policy *(returns a placeholder today — for per-CVE SLA compliance use the `sla_status` field on `search_vulnerabilities`)* |
 
 ### 6 Analyst Workflow Skills
 
@@ -71,7 +77,7 @@ Skills provide guided, multi-step workflows for common analyst tasks:
 > "Triage CVE-2025-21298 — is it in our environment and how urgent is it?"
 
 **Asset Risk:**
-> "Assess the risk on endpoint PROD-WEB-01"
+> "Assess the risk on asset PROD-WEB-01"
 
 **Software Risk:**
 > "What are the top 10 riskiest software products in our environment?"
@@ -101,8 +107,8 @@ marketplace/
 ├── plugins/
 │   └── spektion/
 │       ├── .claude-plugin/
-│       │   ├── plugin.json
-│       │   └── mcp.json
+│       │   └── plugin.json
+│       ├── .mcp.json
 │       └── skills/
 │           ├── cve-triage/
 │           ├── asset-risk-assessment/
