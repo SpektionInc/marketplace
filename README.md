@@ -44,7 +44,7 @@ Once installed, Claude can directly call these Spektion tools:
 | **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` |
 | **Sensors** | `query_sensors` |
 
-\* Tools are served live by the MCP server, so the newest ones appear only on recent builds. `count_ai_session_detections` needs a build newer than 2026-09; `get_ai_session_artifacts` one from 2026-09-15; `count_secrets_by_detector` from 2026-09-17; and `get_asset_executables` and `get_executable_details` from 2026-09-24, when they were promoted from the chat-only surface. An older deployment simply lists fewer than 24 tools — nothing else changes, and the skills degrade to the tools that are present.
+\* Tools are served live by the MCP server, so the newest ones appear only on recent builds. `count_ai_session_detections` needs a build from 2026-09-09; `get_ai_session_artifacts` one from 2026-09-15; `count_secrets_by_detector` from 2026-09-17; and `get_asset_executables` and `get_executable_details` from 2026-09-24, when they were promoted from the chat-only surface. An older deployment simply lists fewer than 24 tools — nothing else changes, and the skills degrade to the tools that are present.
 
 Most `search_*` tools accept asset-scope parameters (`asset_tags`, `asset_importance`, `asset_type`) to scope any question to a subset of the fleet — e.g. "critical CVEs on my production servers".
 
