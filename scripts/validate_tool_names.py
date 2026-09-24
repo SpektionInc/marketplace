@@ -12,7 +12,7 @@ import re
 import sys
 from pathlib import Path
 
-# Canonical MCP-visible tools (LaneBoth + LaneMCP), spektionapi origin/master 2026-09-14.
+# Canonical MCP-visible tools (LaneBoth + LaneMCP), spektionapi origin/master 2026-09-24.
 CANONICAL_TOOLS = {
     "search_assets",
     "search_vulnerabilities",
@@ -20,11 +20,15 @@ CANONICAL_TOOLS = {
     "search_detections",
     "search_executables",
     "search_secrets",
+    "count_secrets_by_detector",
     "search_network_activity",
     "search_ai_sessions",
     "search_ai_security_risks",
     "count_ai_session_detections",
+    "get_ai_session_artifacts",
     "get_asset_details",
+    "get_asset_executables",
+    "get_executable_details",
     "get_vulnerability_details",
     "get_software_details",
     "get_detection_events",
