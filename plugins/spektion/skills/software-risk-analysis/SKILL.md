@@ -45,10 +45,10 @@ For each high-risk software product, call `get_software_details` with `software_
 - **Version spread** — how many versions are deployed (version fragmentation = patch gaps)
 - **Usage status** — which endpoints actively use it vs having it installed but unused
 - **Risk flags:**
-  - `has_high_risks` — has critical/high severity CVEs
+  - `has_high_risks` — has a high or critical severity runtime detection (not a CVE)
   - `has_elevated_risk` — has elevated risk detections
-  - `has_runtime_weakness` — has runtime weakness detections
-  - `has_remote_exploitability` — has remotely exploitable CVEs
+  - `has_runtime_weakness` — has an enabled detection in the `runtime_weakness` category
+  - `has_remote_exploitability` — has an enabled detection in the `remotely_exploitable` category (not a CVE attribute; use `search_vulnerabilities` for CVE exploitability)
 
 ### Step 3: Analyze Network Behavior
 
