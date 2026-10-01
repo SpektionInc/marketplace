@@ -78,7 +78,7 @@ Page only as far as needed with `limit` (default 20, max 100) and `offset` (defa
 
 For risk that software-level views miss, call `search_executables`:
 - `is_linked_to_software: false` — binaries not attributed to any canonical software (shadow IT, droppers, custom tooling)
-- `is_signed: "false"` — unsigned executables
+- `is_signed: "false"` — executables with **no captured certificate**. Not the console's "Unsigned" label: a binary the OS trusts whose certificate was never captured has `is_signed: false` and is labelled **Trusted**. Unsigned is `is_signed: false` **and** `is_trusted: false` — read both before reporting one as unsigned.
 - Each result includes signing/trust status, asset count, detection categories, and per-detection details (name, category, severity, cve_likelihood)
 - `sort_by: asset_count` ranks by deployment breadth across the whole filtered set, so the widest-deployed risky binaries come first rather than the most recently seen
 
