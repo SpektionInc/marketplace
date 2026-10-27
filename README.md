@@ -162,8 +162,7 @@ return placeholders, and three prompt bodies lack the required guidance. Use
 the bundled skills for these workflows; never infer a tenant SLA policy from a
 placeholder. The credentialed release gate continues to reject those responses.
 Publish only after the target deployment combines the new tools with the API
-hardening and passes live acceptance. See the [capability review](plugins/spektion/docs/mcp-capability-review-2026-10-27.md)
-for the source revisions, tool boundaries, and remaining service dependencies.
+hardening and passes live acceptance.
 
 AI detection prevalence uses distinct session counts with both denominators;
 scanner findings are a separate population. Session drill-through preserves the
