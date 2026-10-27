@@ -1,0 +1,28 @@
+{
+  "name": "call_get_asset_executables",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "get_asset_executables",
+    "method": "tools/call",
+    "params": {
+      "name": "get_asset_executables",
+      "arguments": {
+        "hostname": "PROD-WEB-01",
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "get_asset_executables",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"hostname\": \"PROD-WEB-01\", \"sensor_id\": \"fixture-asset-001\", \"enabled\": true, \"items\": [{\"hash\": \"sha256:aa11bb22\", \"hash_md5\": \"\", \"path\": \"/fixture/tool\", \"execution_count\": 1, \"is_signed\": false, \"is_trusted\": true, \"detection_count\": 1, \"detection_categories\": [\"runtime_weakness\"]}], \"total_count\": 1, \"returned\": 1, \"offset\": 0, \"limit\": 5}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

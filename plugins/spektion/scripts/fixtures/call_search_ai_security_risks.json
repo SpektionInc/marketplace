@@ -1,0 +1,27 @@
+{
+  "name": "call_search_ai_security_risks",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "search_ai_security_risks",
+      "arguments": {
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"items\": [{\"event_id\": \"AISEC-5\", \"event_time\": \"2025-09-02T09:00:00Z\", \"source\": \"runtime\", \"rule_id\": \"AI-11\", \"rule_name\": \"Agent Spawned Nested Agent\", \"severity\": \"critical\", \"hostname\": \"DEV-LAP-3\", \"platform\": \"macos\", \"asset_id\": \"ast-3\", \"cvss_v31_score\": 9.1, \"cvss_v40_score\": 9.3, \"process_path\": \"/usr/local/bin/claude\", \"matched_params\": [\"agent=codex\"], \"detail_url\": \"https://app.spektion.com/ai-security/AISEC-5\"}], \"total_count\": 1, \"returned\": 1}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

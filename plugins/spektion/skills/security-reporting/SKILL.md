@@ -1,6 +1,6 @@
 ---
 name: security-reporting
-description: Generate executive and operational security reports from Spektion data. Produces structured reports covering security posture, vulnerability metrics, remediation trends, top risks, and actionable recommendations.
+description: Generate executive and operational security reports from Spektion data. Produces structured reports covering security posture, vulnerability metrics, remediation trends, top risks, AI detection prevalence, and actionable recommendations.
 ---
 
 # Security Reporting
@@ -32,6 +32,7 @@ Technical, actionable. Suitable for security engineers and vulnerability analyst
 - Top 10 critical/high CVEs with blast radius
 - Software risk highlights
 - Runtime detection activity summary
+- AI security and secrets exposure (when relevant)
 - Specific action items with owners
 
 ## Report Generation Workflow
@@ -39,28 +40,31 @@ Technical, actionable. Suitable for security engineers and vulnerability analyst
 ### Step 1: Gather Posture Overview
 
 Call `get_security_posture` to establish the baseline:
-- Total assets, active vs stale
-- Assets by platform
-- Software count by platform
-- Detection count
-- Vulnerability counts by severity (critical, high, medium, low)
+- Total assets, with an active / stale / disabled breakdown (`active_assets`, `stale_assets`, `disabled_assets` — disjoint and summing to `total_assets`; `stale_threshold_days` = 30)
+- Assets by platform (`assets_by_platform`)
+- Total canonical software and software by platform (`total_software`, `software_by_platform`)
+- Vulnerability counts by severity (`vulnerabilities_by_severity`: critical, high, medium, low, unknown) and `total_vulnerabilities`
+- Total runtime detections (`total_detections`, when available)
+- Organizational exposure headline when present: `org_exposure_score`, `org_exposure_severity`, `org_exposure_delta` (change vs previous period; negative means improving)
 
 ### Step 2: Pull Remediation Metrics
 
 Call `get_remediation_metrics` (with optional `severity`, `platform`, `start_time`, `end_time` filters):
-- Current vs previous period median/mean/P10/P90 days to remediate
-- KEV-specific remediation metrics
-- SLA compliance rates
+- Current vs previous period `median`/`mean`/`p10`/`p90_days_to_remediate` (each `{current, previous, total_vulns}`)
+- `kev_mean_days_to_remediate` for CISA KEV vulnerabilities
+- `sla_compliance` — current-open counts per severity tier (`{severity, onTrack, overdue, totalVulns}`)
 
-Call `get_vulnerability_trends` (with same filters):
-- Daily new vs resolved vulnerability delta
-- Distribution by age and severity
-- CVE blindspots and preemptive exposure
+> **Note:** Report SLA compliance as counts of the currently open population, not as a percentage or pass/fail rate. Do not compare remediation times against SLA thresholds — the tools do not return thresholds; use `sla_status`/`sla_due_date` from `search_vulnerabilities` / `get_vulnerability_details` for per-CVE compliance statements.
+
+Call `get_vulnerability_trends` (with the same filters):
+- Daily new vs resolved vulnerability delta (`vulnerability_delta[]`: `date`, `delta`, `new`, `resolved`, `total_open_vulns`, `asset_count`)
+- Distribution by age and severity (`vulnerability_distribution[]`: `days`, `severity`, `count`)
+- CVE blindspots and preemptive exposure (`cve_blindspot`, `preemptive_cve`: `{software, assets, installs}`)
 
 ### Step 3: Identify Top Risks
 
 **Critical/high CVEs:**
-Call `search_vulnerabilities` with `severity: critical`, `sort_by: endpoint_count`, `limit: 10` — then repeat for `severity: high`.
+Call `search_vulnerabilities` with `severity: critical`, `sort_by: endpoint_count`, `limit: 10` — then repeat for `severity: high`. Include `sla_status` for compliance context.
 
 **KEV vulnerabilities:**
 Call `search_vulnerabilities` with `kev: true`, `sort_by: epss_score`, `limit: 10`.
@@ -69,16 +73,24 @@ Call `search_vulnerabilities` with `kev: true`, `sort_by: epss_score`, `limit: 1
 Call `search_software` with `sort_by: cve_count`, `limit: 10`.
 
 **Runtime detections:**
-Call `search_detections` with `sort_by: endpoint_count`, `limit: 100`, and page by advancing `offset` by the requested page size (0, 100, 200, …) until `offset` reaches the `total_count` reported by the **first** page (read it once at `offset: 0` — a page past the end reports `total_count: 0`, so don't re-read it from later pages); then select the critical/high rows by their returned `highest_impact` field. Do **not** stop on a page that returns fewer than `limit` rows: disabled rules are dropped server-side *after* backend pagination, so a mid-range page can come back short while later pages still hold matches (`total_count` counts backend matches before that drop, which makes it the correct stop signal — it can only over-extend paging, never truncate it). Filtering a single page instead misses low-prevalence critical rules — a critical detection on one endpoint sorts below every widespread low-impact rule. If you deliberately stop paging early, label the detections section of the report as partial. (Do not use the server-side `highest_impact` filter or `sort_by: highest_impact` — they currently return zero rows / mis-ordered results; ENG-3614.)
+Call `search_detections` with `highest_impact: critical`, then repeat with `highest_impact: high`; current builds filter the returned impact, and `total_count` counts the filtered population before paging. Page with `limit` and `offset` when the question needs every match. On a deployment without the ENG-3614 fix, page by `sort_by: endpoint_count` without an impact filter and select returned impact client-side. Label an incomplete walk as partial; schema presence alone does not establish the filter fix is deployed.
 
 **Secrets exposure:**
-Call `search_secrets` with `sort_by: detector_name`, `limit: 100` and read `total_count` for the tenant-wide finding count; describe the kinds of secrets from the returned `detector_name` values ("SSH Private Key", "JWT Token", "AWS Secret Access Key", …). Do not filter or rank by `severity` — on current-scanner findings it is a constant wrapper value, the tool has no severity filter, and a passed one is ignored rather than rejected. There is no `offset`, so when `total_count` exceeds the returned rows, present the rows as a sample of `total_count`, never as the full set. Report it as "recorded secret findings" — secret scanning is opt-in per asset, so the absence of findings is not evidence of absence. *(The `detector_name` filter and `sort_by: detector_name` require a server build newer than 2026-09-15 — ENG-3617; on older builds omit them, keep the default `event_time` sort, and read each finding's detector from `outputs.name`.)*
+Use `count_secrets_by_detector` for totals and detector coverage. Report `finding_count` and distinct `asset_count` per detector alongside `findings_total`, `assets_with_findings`, `assets_scanned_for_secrets`, and `assets_total`. Per-detector asset counts overlap; findings with incomplete detector identities can contribute to the total without a row. Inspect `message` and `truncated` before interpreting zeros or claiming all detector types are listed.
+
+For selected findings, call `search_secrets` with the returned exact `detector_id` and the SAME hostname, asset ID, and asset scope as the census. A substring `detector_name` filter can include other detectors and cannot reproduce an exact census row. Current builds page using `offset`; verify that schema and response support it before paging older deployments. If census or paging is unavailable, disclose that any returned detector list is a sample. Use `detector_name` (or `outputs.name` on older builds), never the constant wrapper severity/rule name, to describe types. Do not copy secret values. Zero findings do not establish that unscanned assets are clean.
 
 **AI agent activity:**
-Call `count_ai_session_detections` (with `recency_days: 30` for a current view) for a census of AI-session detections by rule, then `search_ai_sessions` with `severity: critical` or `high` and the same `recency_days` for the sessions behind them. Call `search_ai_security_risks` for AI-related risk findings outside sessions. *(`count_ai_session_detections` requires a server build newer than 2026-09; if it is not in your tool list, use `search_ai_sessions` alone.)*
+Follow the AI workflow below for census and matching session drill-through. If the census tool is absent from discovery, use session search for a bounded investigation and disclose that detection prevalence is unavailable.
 
 **SLA context:**
 Read the server-computed `sla_status` field on `search_vulnerabilities` results to report overdue vs within-SLA per CVE. (`get_tenant_settings` currently returns a placeholder message, not the SLA policy — do not source thresholds from it.)
+
+**AI security and secrets (operational reports, when relevant):**
+- Call `search_ai_security_risks` to surface AI/agent security detections (filter by `severity` or `source: runtime|scan`; results include CVSS v3.1/v4.0 scores and matched params)
+- Call `count_ai_session_detections` for AI detection prevalence with a stated `recency_days` window and requested asset scope. Report distinct sessions per rule alongside `sessions_with_detections` and `sessions_total`; counts overlap and must not be summed. Inspect scope/error messages before interpreting zeros. Scanner findings are outside this census.
+- Call `search_ai_sessions` to drill into a census row using its returned `detection_id` as an array, copying the same recency window and all shared scope filters. Its `total_count` is the matching population; `returned` is a page size.
+- Call `search_secrets` for finding metadata; use exact `asset_id` for a single asset. Report `total_count` as findings, not unique credentials or a count of returned rows. Asset `secret_count` is latest-scan findings; zero does not distinguish unscanned from clean. Detector types come from `detector_name`, falling back to `outputs.name` on older builds; do not copy credential values into the report.
 
 ### Step 4: Synthesize Report
 
@@ -97,7 +109,7 @@ Structure the report based on audience:
 [3-5 bullet points, business-impact language]
 
 ## SLA Compliance
-[Pass/fail by severity tier]
+[Open-vulnerability counts by severity tier, per-vulnerability sla_status]
 
 ## Recommendations
 [3-5 prioritized recommendations]
@@ -106,22 +118,22 @@ Structure the report based on audience:
 **Operational format:**
 ```
 ## Environment Overview
-[Asset counts, platform breakdown, software/detection counts]
+[Asset counts, active/stale/disabled, platform breakdown, software/detection counts]
 
 ## Vulnerability Summary
 [Counts by severity, new vs resolved, backlog trend]
 
 ## Remediation Performance
-[Median/mean/P90 by severity, SLA compliance rates, KEV metrics]
+[Median/mean/P90 by severity, SLA open counts, KEV metrics]
 
 ## Top 10 Critical CVEs
-[Table: CVE ID, severity, EPSS, KEV, endpoint count, SLA status]
+[Table: CVE ID, severity, EPSS, KEV, endpoint count, sla_status]
 
 ## Software Risk Highlights
 [Top riskiest software by CVE count and detection count]
 
 ## Runtime Detection Activity
-[Critical/high detections by category (`runtime_weakness`, `exploit_impact`, `remotely_exploitable`), CVE correlation via `cve_likelihood`, affected scope]
+[Critical/high detections by category (`runtime_weakness`, `exploit_impact`, `remotely_exploitable`), CVE correlation via `cve_likelihood`, affected scope (`endpoint_count`, `software_count`)]
 
 ## Secrets & AI Agent Activity
 [Recorded secret findings by detector type (`detector_name`); AI session counts, detection census, critical/high sessions]
@@ -137,7 +149,7 @@ For any metric, compare current vs previous period:
 - **Declining:** current > previous (flag as concern)
 - **Stable:** within 5% variance (note as maintained)
 
-Include the vulnerability delta from trends data to show if the backlog is growing or shrinking.
+Include the vulnerability delta from trends data to show if the backlog is growing or shrinking, and the `org_exposure_delta` from posture where available.
 
 ## Quick Reference
 
@@ -146,12 +158,12 @@ Include the vulnerability delta from trends data to show if the backlog is growi
 | Get posture overview | `get_security_posture` | (none) |
 | Get remediation metrics | `get_remediation_metrics` | `severity`, `platform`, `start_time`, `end_time` |
 | Get vulnerability trends | `get_vulnerability_trends` | `severity`, `platform`, `start_time`, `end_time` |
-| Search critical CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by`, `limit` |
+| Search critical CVEs | `search_vulnerabilities` | `severity`, `kev`, `sort_by`, `limit`, `offset` |
 | Search risky software | `search_software` | `sort_by: cve_count`, `limit` |
-| Search detections | `search_detections` | `sort_by: endpoint_count`, `limit` (impact triage client-side — ENG-3614) |
-| Count secret findings | `search_secrets` | `detector_name`, `sort_by` (`event_time`/`detector_name`) — both server ≥ 2026-09-15, ENG-3617; `limit` (read `total_count`; no `offset` — rows beyond `limit` are unreachable, label as a sample) |
-| AI detection census | `count_ai_session_detections` | `severity`, `recency_days` |
-| Search AI sessions | `search_ai_sessions` | `severity`, `recency_days`, `sort_by`, `limit`, `offset` |
-| Search AI risk findings | `search_ai_security_risks` | `severity`, `source`, `limit`, `offset` |
-| Per-CVE SLA status | `search_vulnerabilities` | read `sla_status` on results (`get_tenant_settings` is a placeholder today) |
+| Search detections | `search_detections` | `highest_impact`, `sort_by: highest_impact`, `limit` |
+| Count AI detection prevalence | `count_ai_session_detections` | `recency_days`, `hostname`, `agent`, `classification`, `severity`, `asset_tags`, `asset_importance`, `asset_type` |
+| Drill into AI sessions | `search_ai_sessions` | `detection_id`, `recency_days`, `hostname`, `agent`, `classification`, `severity`, `asset_tags`, `asset_importance`, `asset_type`, `limit`, `offset` |
+| Search AI security risks | `search_ai_security_risks` | `severity`, `source`, `rule_name`, `sort_by`, `limit` |
+| Count secret coverage | `count_secrets_by_detector` | `hostname`, `asset_id`, `asset_tags`, `asset_importance`, `asset_type` |
+| Search exposed secrets | `search_secrets` | `detector_id`, `detector_name`, `asset_id`, `hostname`, `sort_by`, `limit`, `offset` |
 | View platforms | Resource: `spektion://platforms` | N/A |

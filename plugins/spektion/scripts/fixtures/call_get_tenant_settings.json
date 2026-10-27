@@ -1,0 +1,25 @@
+{
+  "name": "call_get_tenant_settings",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "get_tenant_settings",
+      "arguments": {}
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"sla_matrix\": {\"critical\": 7, \"high\": 14, \"medium\": 30, \"low\": 90}, \"kev_override\": 5, \"default_asset_importance\": \"3\"}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

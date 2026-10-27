@@ -1,0 +1,25 @@
+{
+  "name": "resources_read",
+  "cases": [
+    {
+      "request": {"jsonrpc": "2.0", "id": "r1", "method": "resources/read", "params": {"uri": "spektion://platforms"}},
+      "response": {"jsonrpc": "2.0", "id": "r1", "result": {"contents": [{"uri": "spektion://platforms", "mimeType": "text/plain", "text": "windows, macos, linux"}]}}
+    },
+    {
+      "request": {"jsonrpc": "2.0", "id": "r2", "method": "resources/read", "params": {"uri": "spektion://software-categories"}},
+      "response": {"jsonrpc": "2.0", "id": "r2", "result": {"contents": [{"uri": "spektion://software-categories", "mimeType": "application/json", "text": "[{\"name\":\"Browser\",\"count\":12}]"}]}}
+    },
+    {
+      "request": {"jsonrpc": "2.0", "id": "r3", "method": "resources/read", "params": {"uri": "spektion://software-publishers"}},
+      "response": {"jsonrpc": "2.0", "id": "r3", "result": {"contents": [{"uri": "spektion://software-publishers", "mimeType": "application/json", "text": "[{\"name\":\"Example Publisher\",\"count\":4}]"}]}}
+    },
+    {
+      "request": {"jsonrpc": "2.0", "id": "r4", "method": "resources/read", "params": {"uri": "spektion://sla-policy"}},
+      "response": {"jsonrpc": "2.0", "id": "r4", "result": {"contents": [{"uri": "spektion://sla-policy", "mimeType": "application/json", "text": "{\"source\":\"tenant\",\"sla_matrix\":{\"critical\":7,\"high\":14,\"medium\":30,\"low\":90},\"kev_override\":5,\"default_asset_importance\":\"3\"}"}]}}
+    },
+    {
+      "request": {"jsonrpc": "2.0", "id": "r5", "method": "resources/read", "params": {"uri": "spektion://detection-rules"}},
+      "response": {"jsonrpc": "2.0", "id": "r5", "result": {"contents": [{"uri": "spektion://detection-rules", "mimeType": "application/json", "text": "{\"status\":\"loaded\",\"message\":\"Use the search_detections tool to query detection rules\"}"}]}}
+    }
+  ]
+}

@@ -8,37 +8,14 @@ lanes LaneBoth + LaneMCP). Fails on any unknown name. ENG-3616; the
 registry-side CI check is ENG-3547.
 """
 
+import json
 import re
 import sys
 from pathlib import Path
 
-# Canonical MCP-visible tools (LaneBoth + LaneMCP), spektionapi origin/master 2026-09-24.
-CANONICAL_TOOLS = {
-    "search_assets",
-    "search_vulnerabilities",
-    "search_software",
-    "search_detections",
-    "search_executables",
-    "search_secrets",
-    "count_secrets_by_detector",
-    "search_network_activity",
-    "search_ai_sessions",
-    "search_ai_security_risks",
-    "count_ai_session_detections",
-    "get_ai_session_artifacts",
-    "get_asset_details",
-    "get_asset_executables",
-    "get_executable_details",
-    "get_vulnerability_details",
-    "get_software_details",
-    "get_detection_events",
-    "get_detection_controls",
-    "get_security_posture",
-    "get_remediation_metrics",
-    "get_vulnerability_trends",
-    "get_tenant_settings",
-    "query_sensors",
-}
+# Generated contract is the source of truth; do not maintain a second tool list.
+CONTRACT_PATH = Path(__file__).resolve().parents[1] / "plugins/spektion/contract/mcp-contract.json"
+CANONICAL_TOOLS = {tool["name"] for tool in json.loads(CONTRACT_PATH.read_text())["mcp"]["tools"]}
 
 # Referenced but deliberately not validated against the Spektion registry.
 ALLOWLIST = {

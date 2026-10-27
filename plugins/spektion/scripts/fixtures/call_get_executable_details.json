@@ -1,0 +1,27 @@
+{
+  "name": "call_get_executable_details",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "get_executable_details",
+    "method": "tools/call",
+    "params": {
+      "name": "get_executable_details",
+      "arguments": {
+        "hash": "sha256:aa11bb22"
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "get_executable_details",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"hash\": \"sha256:aa11bb22\", \"hash_md5\": \"\", \"filenames\": [\"tool\"], \"platform\": \"macos\", \"is_signed\": false, \"is_trusted\": true, \"is_linked_to_software\": false, \"asset_count\": 1, \"detection_count\": 1, \"paths\": [{\"path\": \"/fixture/tool\", \"hostname\": \"PROD-WEB-01\", \"platform\": \"macos\", \"is_signed\": false, \"is_trusted\": true, \"risk_count\": 1}]}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

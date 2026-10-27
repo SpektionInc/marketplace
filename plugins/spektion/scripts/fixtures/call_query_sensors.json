@@ -1,0 +1,27 @@
+{
+  "name": "call_query_sensors",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "query_sensors",
+      "arguments": {
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"items\": [{\"sensor_id\": \"sn-9\", \"hostname\": \"PROD-WEB-01\", \"os_family\": \"windows\", \"os_version\": \"10.0.17763\", \"agent_version\": \"2.4.1\", \"endpoint_type\": \"server\", \"enabled\": true, \"importance\": 2, \"first_seen\": \"2024-01-15T08:00:00Z\", \"last_seen\": \"2025-09-03T01:00:00Z\", \"grade\": \"C\", \"score\": 52}], \"total_count\": 120, \"count\": 5, \"offset\": 0, \"summary\": \"Showing 5 of 120 sensors\"}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

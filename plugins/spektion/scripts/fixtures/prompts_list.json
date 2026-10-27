@@ -1,0 +1,87 @@
+{
+  "name": "prompts_list",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "4",
+    "method": "prompts/list",
+    "params": {}
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "4",
+    "result": {
+      "prompts": [
+        {
+          "name": "security_review",
+          "description": "Comprehensive security posture review",
+          "arguments": [
+            {
+              "name": "platform",
+              "description": "Platform to focus on (windows, macos, linux)",
+              "required": false
+            },
+            {
+              "name": "time_period",
+              "description": "Time period for the review (e.g. 7d, 30d, 90d)",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "investigate_cve",
+          "description": "CVE impact investigation workflow",
+          "arguments": [
+            {
+              "name": "cve_id",
+              "description": "The CVE identifier to investigate (e.g. CVE-2024-1234)",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "endpoint_risk_assessment",
+          "description": "Single-endpoint security assessment",
+          "arguments": [
+            {
+              "name": "hostname",
+              "description": "The hostname of the endpoint to assess",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "vulnerability_report",
+          "description": "Vulnerability management report with metrics",
+          "arguments": [
+            {
+              "name": "time_period",
+              "description": "Reporting period (e.g. 7d, 30d, 90d)",
+              "required": false
+            },
+            {
+              "name": "severity",
+              "description": "Severity filter (critical, high, medium, low)",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "software_risk_analysis",
+          "description": "Software risk prioritization analysis",
+          "arguments": [
+            {
+              "name": "software_name",
+              "description": "Name of the software to analyze",
+              "required": false
+            },
+            {
+              "name": "grade",
+              "description": "Software grade filter (applied client-side)",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

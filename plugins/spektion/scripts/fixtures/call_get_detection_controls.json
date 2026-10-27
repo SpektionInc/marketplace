@@ -1,0 +1,27 @@
+{
+  "name": "call_get_detection_controls",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "get_detection_controls",
+      "arguments": {
+        "detection_id": "DET-00007"
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"detection_id\": \"DET-00007\", \"detection_name\": \"Weak Crypto\", \"detail_url\": \"https://app.spektion.com/risks/DET-00007\", \"preventive_controls\": [{\"id\": \"PC-1\", \"title\": \"Enforce TLS 1.2+ ciphers\", \"description\": \"Disable RC4 and CBC ciphers.\", \"effectiveness\": 0.8, \"effort\": 0.3}], \"preventive_control_count\": 1, \"vendor_fix_only\": false, \"detective_control\": {\"format\": \"sigma\", \"content\": \"detection: selection: - 'cipher=RC4'\"}, \"detective_control_error\": \"\"}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

@@ -19,7 +19,7 @@ You are a vulnerability analyst performing software portfolio risk analysis usin
 
 ### Step 1: Identify Riskiest Software
 
-Start with a broad risk assessment:
+Start with a broad risk assessment using `search_software` (sortable by `cve_count`, `endpoint_count`, `detection_count`, or `score`; `limit` defaults to 20, max 100; page with `offset`):
 
 **By vulnerability exposure:**
 Call `search_software` with `sort_by: cve_count` and `limit: 20` to find software with the most CVEs.
@@ -31,9 +31,11 @@ Call `search_software` with `sort_by: detection_count` to find software triggeri
 Call `search_software` with `sort_by: endpoint_count` to find the most widely deployed software.
 
 **By score:**
-Call `search_software` with `sort_by: score` to find the worst-scored software products.
+Call `search_software` with `sort_by: score` to find the highest-risk software by Spektion's risk score (a higher returned score is riskier).
 
-For large inventories, page through `search_software` with `offset` (results are capped at 100 per page).
+> **Note:** Grade (A–F) is returned as a field but is NOT a server-side sort or filter. To rank by grade, sort by `cve_count` or `score`, read the `grade` field from each returned row, and render the highest-risk products. Page with `offset` to cover the full set — never make exhaustive claims about the whole portfolio from a single 20-item page.
+
+For large inventories, continue paging with `offset` rather than a separate query tool — `search_software` is the single paginated surface.
 
 ### Step 2: Deep-Dive Riskiest Products
 
@@ -41,22 +43,26 @@ For each high-risk software product, call `get_software_details` with `software_
 
 > **Note:** `get_software_details` groups results by platform. Access software metadata via `items[].software` and per-endpoint data via `items[].assets[]`.
 
-- **Deployment scope** — which endpoints have it installed, their business impact tiers
+- **Deployment scope** — which endpoints have it installed and their business impact tiers
 - **Version spread** — how many versions are deployed (version fragmentation = patch gaps)
 - **Usage status** — which endpoints actively use it vs having it installed but unused
 - **Risk flags:**
-  - `has_high_risks` — has critical/high severity CVEs
+  - `has_high_risks` — has a known, enabled runtime detection classified high severity using its elevated or non-elevated impact
   - `has_elevated_risk` — has elevated risk detections
   - `has_runtime_weakness` — has runtime weakness detections
-  - `has_remote_exploitability` — has remotely exploitable CVEs
+  - `has_remote_exploitability` — has a known, enabled runtime detection in the remotely-exploitable category; this software flag is not the similarly named CVE field
+
+Risk flags summarize runtime detections rather than CVE severity. Missing enrichment is unknown. Under asset scope, software detection counts describe rules applying to installed versions, not observed triggers on those assets; software detail and network activity remain fleet-wide.
 
 ### Step 3: Analyze Network Behavior
 
-For software that makes network connections (`makes_network_connection: true`), call `search_network_activity` with `software_name`:
-- **External destinations** — software connecting outside the network (potential data exfiltration, C2, or legitimate SaaS)
-- **Unexpected listeners** — software binding to network ports (potential backdoor or unnecessary service)
-- **Connection frequency** — high observation counts indicate regular behavior; new/low counts warrant investigation
+For software whose returned `makes_network_connection` field is true, call `search_network_activity` with `software_name`:
+- **External destinations** — `destinations[]` where `is_internal: false` (potential data exfiltration, C2, or legitimate SaaS); each has `destination_value`, `destination_type`, `port`, `activity_type`, `connection_count`, and `is_internal`
+- **Unexpected listeners** — `listeners[]` with `bind_address`, `port`, `activity_type`, and `listener_count` (potential backdoor or unnecessary service)
+- **Connection frequency** — high `connection_count` values indicate regular behavior; new/low counts warrant investigation
 - **Internal connections** — lateral movement pathways between hosts
+
+> **Note:** These field names belong to `search_network_activity`. The smaller embedded `network_activity` list inside `get_asset_details` still uses `destination`, `activity`, and `observation_count` — do not mix the two schemas.
 
 ### Step 4: Correlate Runtime Detections
 
@@ -64,7 +70,7 @@ Call `search_detections` to find detections associated with the software:
 - Filter by `platform` matching the software's platform
 - Look for detections with high `cve_likelihood` (`probability: "high"`) — these indicate the software's behavior patterns resemble CVE exploitation
 - Check categories: `"runtime_weakness"` (insecure configurations), `"exploit_impact"` (observed exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
-- Note: `search_detections` returns `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, `first_seen`, and affected asset/software counts; use `get_detection_events` for the per-software evidence behind a detection
+- `search_detections` now returns `name`, `highest_impact`, `category`, `subcategory`, `platform`, `cve_likelihood`, `first_seen`, and the affected `endpoint_count` / `software_count` directly — no extra call needed for detection breadth. Page with `offset`.
 
 For evidence behind a specific runtime detection, call `get_detection_events` with its `detection_id` (or resolve by `name`). Results are software-product groups, not individual events; `total_count` includes one unattributed group when present.
 
@@ -79,12 +85,14 @@ Page only as far as needed with `limit` (default 20, max 100) and `offset` (defa
 For risk that software-level views miss, call `search_executables`:
 - `is_linked_to_software: false` — binaries not attributed to any canonical software (shadow IT, droppers, custom tooling)
 - `is_signed: "false"` — unsigned executables
-- Each result includes signing/trust status, asset count, detection categories, and per-detection details (name, category, severity, cve_likelihood)
+- Unscoped results include signing/trust status, asset count, and available detection details. Scoped search omits detection and compilation provenance fields; use executable detail with the same scope when needed. Missing fields do not mean detection-free.
 - `sort_by: asset_count` ranks by deployment breadth across the whole filtered set, so the widest-deployed risky binaries come first rather than the most recently seen
 
 Both filters run server-side, so `total_count` is the size of the filtered set rather than of a sample. Page it with `offset`, advancing by the **echoed** `limit` (a larger request is clamped to `max_limit`) until `offset + returned` reaches `total_count`, and treat `truncated=true` as "more remain" rather than reading a short page as the end. Dedupe by hash: the list is rebuilt every 15 minutes, and a walk crossing a rebuild can repeat and skip rows while still collecting exactly `total_count` of them, so the count alone does not prove the walk was complete.
 
 **Server compatibility.** The two halves ([spektionapi#374](https://github.com/SpektionInc/spektionapi/pull/374), [spektion-analytics#261](https://github.com/SpektionInc/spektion-analytics/pull/261)) deploy independently and fail differently. If the tool schema does not declare `offset`, this build cannot page — the reach is the newest ~100 executables fleet-wide, `sort_by` is inert, so rank what you got by `asset_count` client-side and say enumeration is unavailable. If instead the response carries `total_count_unavailable: true`, paging works but the server applied **neither** `is_signed` nor `platform` nor the sort — only `is_linked_to_software`, and that after the fact — so re-check signing and platform on each row before calling anything unsigned, and do not present the order as a ranking. The asset-risk-assessment skill states both cases in full.
+
+The console labels a binary Trusted only when both signing flags are true, Signed when only `is_signed` is true, and Unsigned when `is_signed` is false. On macOS, `is_trusted` alone can reflect ad-hoc validation; these flags cannot establish that a binary is safe or conclusively identify its signing method.
 
 ### Step 6: Produce Risk Ranking
 
@@ -96,7 +104,7 @@ Combine all signals into a composite risk ranking:
 | **Runtime detections** | `detection_count`, cve_likelihood | High |
 | **Deployment breadth** | `endpoint_count` + importance tiers | High |
 | **Network exposure** | External connections, listeners | Medium |
-| **Exploit availability** | `has_remote_exploitability`, `exploit_impacts` | Medium |
+| **Exploit availability** | `has_remote_exploitability`, exploit_impacts | Medium |
 | **Usage status** | Unused installs = unnecessary risk | Low |
 
 Deliver a structured report:
@@ -124,6 +132,6 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 | Get software details | `get_software_details` | `software_name` (required) |
 | Check network behavior | `search_network_activity` | `software_name` (required), `limit` |
 | Find runtime detections | `search_detections` | `name`, `category`, `platform`, `sort_by`, `limit`, `offset` |
-| Find risky executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit`, `offset` — paging and `total_count` need a server carrying spektionapi#374 |
+| Find risky executables | `search_executables` | `platform`, `is_signed`, `is_linked_to_software`, `sort_by`, `limit`, `offset` |
 | View categories | Resource: `spektion://software-categories` | N/A |
 | View publishers | Resource: `spektion://software-publishers` | N/A |

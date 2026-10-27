@@ -1,0 +1,25 @@
+{
+  "name": "prompts_get",
+  "cases": [
+    {
+      "request": {"jsonrpc": "2.0", "id": "p1", "method": "prompts/get", "params": {"name": "security_review", "arguments": {"platform": "windows", "time_period": "30d"}}},
+      "response": {"jsonrpc": "2.0", "id": "p1", "result": {"messages": [{"role": "user", "content": {"type": "text", "text": "Call get_security_posture, rank assets with search_assets, and use only controls returned by get_detection_controls."}}]}}
+    },
+    {
+      "request": {"jsonrpc": "2.0", "id": "p2", "method": "prompts/get", "params": {"name": "investigate_cve", "arguments": {"cve_id": "CVE-2025-21298"}}},
+      "response": {"jsonrpc": "2.0", "id": "p2", "result": {"messages": [{"role": "user", "content": {"type": "text", "text": "Call get_vulnerability_details, then use get_asset_details for exact impacted hostnames."}}]}}
+    },
+    {
+      "request": {"jsonrpc": "2.0", "id": "p3", "method": "prompts/get", "params": {"name": "endpoint_risk_assessment", "arguments": {"hostname": "PROD-WEB-01"}}},
+      "response": {"jsonrpc": "2.0", "id": "p3", "result": {"messages": [{"role": "user", "content": {"type": "text", "text": "Call get_asset_details and source hardening only from get_detection_controls."}}]}}
+    },
+    {
+      "request": {"jsonrpc": "2.0", "id": "p4", "method": "prompts/get", "params": {"name": "vulnerability_report", "arguments": {"time_period": "30d", "severity": "critical"}}},
+      "response": {"jsonrpc": "2.0", "id": "p4", "result": {"messages": [{"role": "user", "content": {"type": "text", "text": "Use get_remediation_metrics and get_vulnerability_trends for the requested reporting period."}}]}}
+    },
+    {
+      "request": {"jsonrpc": "2.0", "id": "p5", "method": "prompts/get", "params": {"name": "software_risk_analysis", "arguments": {"software_name": "Google Chrome", "grade": "F"}}},
+      "response": {"jsonrpc": "2.0", "id": "p5", "result": {"messages": [{"role": "user", "content": {"type": "text", "text": "Use search_software and get_software_details; grade filtering is client-side."}}]}}
+    }
+  ]
+}

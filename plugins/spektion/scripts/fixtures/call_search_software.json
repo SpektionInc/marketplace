@@ -1,0 +1,27 @@
+{
+  "name": "call_search_software",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "search_software",
+      "arguments": {
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"items\": [{\"name\": \"Google Chrome\", \"publisher\": \"Google\", \"platform\": \"windows\", \"grade\": \"C\", \"score\": 52, \"severity\": \"high\", \"endpoint_count\": 40, \"unused_endpoint_count\": 5, \"cve_count\": 12, \"detection_count\": 3, \"elevated_detection_count\": 1, \"present_versions\": 4, \"has_high_risks\": true, \"has_elevated_risk\": true, \"has_runtime_weakness\": true, \"has_remote_exploitability\": true, \"makes_network_connection\": true, \"network_destination_count\": 80, \"network_listener_count\": 2, \"detail_url\": \"https://app.spektion.com/software/google-chrome\"}], \"total_count\": 1, \"returned\": 1}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

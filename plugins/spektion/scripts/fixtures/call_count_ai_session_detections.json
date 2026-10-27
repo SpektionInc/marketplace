@@ -1,0 +1,27 @@
+{
+  "name": "call_count_ai_session_detections",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "census-1",
+    "method": "tools/call",
+    "params": {
+      "name": "count_ai_session_detections",
+      "arguments": {
+        "recency_days": 30,
+        "asset_type": "server"
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "census-1",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"items\": [{\"detection_id\": \"DET-AI-1020\", \"detection_name\": \"Credential file reads\", \"session_count\": 3}, {\"detection_id\": \"DET-AI-1030\", \"detection_name\": \"Sensitive file writes\", \"session_count\": 2}], \"distinct_by\": \"session\", \"sessions_with_detections\": 3, \"sessions_total\": 100, \"returned\": 2}"
+        }
+      ]
+    }
+  }
+}

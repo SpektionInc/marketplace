@@ -1,0 +1,27 @@
+{
+  "name": "call_search_detections",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "method": "tools/call",
+    "params": {
+      "name": "search_detections",
+      "arguments": {
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "10",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"items\": [{\"id\": \"DET-00007\", \"name\": \"Weak Crypto\", \"description\": \"uses a weak cipher\", \"highest_impact\": \"high\", \"category\": \"runtime_weakness\", \"subcategory\": \"tls_cipher\", \"platform\": \"windows\", \"endpoint_count\": 12, \"software_count\": 3, \"elevated_software_count\": 1, \"cve_likelihood\": {\"description\": \"similar to CVE-2024-25789 exploitation\", \"probability\": \"high\"}, \"first_seen\": \"2025-06-01T00:00:00Z\", \"detail_url\": \"https://app.spektion.com/risks/DET-00007\"}], \"total_count\": 1, \"returned\": 1}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}
