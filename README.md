@@ -32,18 +32,25 @@ Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) or your project's `.en
 
 ## What You Get
 
-### 20 MCP Tools (Native Access)
+### 24 MCP Tools (Native Access)
 
 Once installed, Claude can directly call these Spektion tools:
 
 | Category | Tools |
 |----------|-------|
-| **Search** | `search_vulnerabilities`, `search_assets`, `search_software`, `search_detections`, `search_network_activity`, `search_secrets`, `search_ai_security_risks`, `search_executables`, `search_ai_sessions` |
-| **Details** | `get_vulnerability_details`, `get_asset_details`, `get_software_details`, `get_detection_events`, `get_detection_controls` |
-| **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` (required tenant SLA/settings authority at release), `count_ai_session_detections` |
-| **Paginated Queries** | `query_sensors` |
+| **Search** | `search_assets`, `search_vulnerabilities`, `search_software`, `search_detections`, `search_executables`, `search_secrets`, `count_secrets_by_detector`*, `search_network_activity` |
+| **Details** | `get_asset_details`, `get_asset_executables`*, `get_executable_details`*, `get_vulnerability_details`, `get_software_details`, `get_detection_events`, `get_detection_controls` |
+| **AI Security** | `search_ai_sessions`, `search_ai_security_risks`, `count_ai_session_detections`*, `get_ai_session_artifacts`* |
+| **Analytics** | `get_security_posture`, `get_remediation_metrics`, `get_vulnerability_trends`, `get_tenant_settings` |
+| **Sensors** | `query_sensors` |
+
+\* Tools are served live by the MCP server, so the newest ones appear only on recent builds. `count_ai_session_detections` needs a build from 2026-09-09; `get_ai_session_artifacts` one from 2026-09-15; `count_secrets_by_detector` from 2026-09-17; and `get_asset_executables` and `get_executable_details` from 2026-09-24, when they were promoted from the chat-only surface. Inspect the deployed tool list and input schemas before calling newer tools or parameters. An older deployment may have fewer tools, different paging behavior, or unavailable scope support; preserve those limits in the answer.
+
+Most `search_*` tools accept asset-scope parameters (`asset_tags`, `asset_importance`, `asset_type`) to scope any question to a subset of the fleet — e.g. "critical CVEs on my production servers".
 
 ### 5 Resources
+
+The table describes the release contract. The SLA policy behavior below still requires API hardening; current API master returns a placeholder.
 
 | Resource | Description |
 |----------|-------------|
@@ -55,7 +62,7 @@ Once installed, Claude can directly call these Spektion tools:
 
 ### 5 MCP Prompts
 
-Prompts are reusable workflows the MCP server exposes; Claude chains the underlying tools to fulfill them:
+Prompts are reusable workflows the MCP server exposes. The release gate checks their bodies for current tool names and required control guidance; current API master still has gaps. Use the bundled skills until that gate passes:
 
 | Prompt | Arguments | Purpose |
 |--------|-----------|---------|
@@ -85,7 +92,7 @@ Skills provide guided, multi-step workflows for common analyst tasks:
 > "Triage CVE-2025-21298 — is it in our environment and how urgent is it?"
 
 **Asset Risk:**
-> "Assess the risk on endpoint PROD-WEB-01"
+> "Assess the risk on asset PROD-WEB-01"
 
 **Software Risk:**
 > "What are the top 10 riskiest software products in our environment?"
@@ -143,7 +150,7 @@ marketplace/
 
 ## Development
 
-The plugin targets **1.1.0**, with 20 read-only tools and seven analyst skills.
+The plugin targets **1.2.0**, with 24 read-only tools and seven analyst skills.
 The contract records separate provenance for the current tool registry/input
 schemas (`source`) and the resource/prompt release requirements
 (`release_surface_source`). The latter come from the API hardening candidate
@@ -155,7 +162,7 @@ return placeholders, and three prompt bodies lack the required guidance. Use
 the bundled skills for these workflows; never infer a tenant SLA policy from a
 placeholder. The credentialed release gate continues to reject those responses.
 Publish only after the target deployment combines the new tools with the API
-hardening and passes live acceptance. See the [capability review](plugins/spektion/docs/mcp-capability-review-2026-09-11.md)
+hardening and passes live acceptance. See the [capability review](plugins/spektion/docs/mcp-capability-review-2026-10-27.md)
 for the source revisions, tool boundaries, and remaining service dependencies.
 
 AI detection prevalence uses distinct session counts with both denominators;

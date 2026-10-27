@@ -1,0 +1,28 @@
+{
+  "name": "call_get_ai_session_artifacts",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": "get_ai_session_artifacts",
+    "method": "tools/call",
+    "params": {
+      "name": "get_ai_session_artifacts",
+      "arguments": {
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "get_ai_session_artifacts",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"session_id\": \"11111111-1111-4111-8111-111111111111\", \"items\": [{\"hash\": \"sha256:aa11bb22\", \"name\": \"tool\", \"path\": \"/fixture/tool\", \"language\": \"go\", \"linked_to_executable\": true, \"detail_url\": \"/executables/sha256:aa11bb22\"}], \"total_count\": 1, \"returned\": 1, \"offset\": 0, \"limit\": 5, \"max_limit\": 100, \"truncated\": false, \"artifacts_state\": \"artifacts_listed\", \"data_notes\": [\"Synthetic build-output metadata; not deployment evidence.\"]}"
+        }
+      ],
+      "isError": false
+    }
+  }
+}

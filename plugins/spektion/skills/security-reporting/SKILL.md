@@ -73,13 +73,24 @@ Call `search_vulnerabilities` with `kev: true`, `sort_by: epss_score`, `limit: 1
 Call `search_software` with `sort_by: cve_count`, `limit: 10`.
 
 **Runtime detections:**
-Call `search_detections` with `highest_impact: critical`, `sort_by: highest_impact`, `limit: 10`.
+Call `search_detections` with `highest_impact: critical`, then repeat with `highest_impact: high`; current builds filter the returned impact, and `total_count` counts the filtered population before paging. Page with `limit` and `offset` when the question needs every match. On a deployment without the ENG-3614 fix, page by `sort_by: endpoint_count` without an impact filter and select returned impact client-side. Label an incomplete walk as partial; schema presence alone does not establish the filter fix is deployed.
+
+**Secrets exposure:**
+Use `count_secrets_by_detector` for totals and detector coverage. Report `finding_count` and distinct `asset_count` per detector alongside `findings_total`, `assets_with_findings`, `assets_scanned_for_secrets`, and `assets_total`. Per-detector asset counts overlap; findings with incomplete detector identities can contribute to the total without a row. Inspect `message` and `truncated` before interpreting zeros or claiming all detector types are listed.
+
+For selected findings, call `search_secrets` with the returned exact `detector_id` and the SAME hostname, asset ID, and asset scope as the census. A substring `detector_name` filter can include other detectors and cannot reproduce an exact census row. Current builds page using `offset`; verify that schema and response support it before paging older deployments. If census or paging is unavailable, disclose that any returned detector list is a sample. Use `detector_name` (or `outputs.name` on older builds), never the constant wrapper severity/rule name, to describe types. Do not copy secret values. Zero findings do not establish that unscanned assets are clean.
+
+**AI agent activity:**
+Follow the AI workflow below for census and matching session drill-through. If the census tool is absent from discovery, use session search for a bounded investigation and disclose that detection prevalence is unavailable.
+
+**SLA context:**
+Read the server-computed `sla_status` field on `search_vulnerabilities` results to report overdue vs within-SLA per CVE. (`get_tenant_settings` currently returns a placeholder message, not the SLA policy — do not source thresholds from it.)
 
 **AI security and secrets (operational reports, when relevant):**
 - Call `search_ai_security_risks` to surface AI/agent security detections (filter by `severity` or `source: runtime|scan`; results include CVSS v3.1/v4.0 scores and matched params)
 - Call `count_ai_session_detections` for AI detection prevalence with a stated `recency_days` window and requested asset scope. Report distinct sessions per rule alongside `sessions_with_detections` and `sessions_total`; counts overlap and must not be summed. Inspect scope/error messages before interpreting zeros. Scanner findings are outside this census.
 - Call `search_ai_sessions` to drill into a census row using its returned `detection_id` as an array, copying the same recency window and all shared scope filters. Its `total_count` is the matching population; `returned` is a page size.
-- Call `search_secrets` for finding metadata; use exact `asset_id` for a single asset. Report `total_count` as findings, not unique credentials or a count of returned rows. Asset `secret_count` is latest-scan findings; zero does not distinguish unscanned from clean. Detector types come from `outputs.name`; do not copy credential values into the report.
+- Call `search_secrets` for finding metadata; use exact `asset_id` for a single asset. Report `total_count` as findings, not unique credentials or a count of returned rows. Asset `secret_count` is latest-scan findings; zero does not distinguish unscanned from clean. Detector types come from `detector_name`, falling back to `outputs.name` on older builds; do not copy credential values into the report.
 
 ### Step 4: Synthesize Report
 
@@ -124,8 +135,8 @@ Structure the report based on audience:
 ## Runtime Detection Activity
 [Critical/high detections by category (`runtime_weakness`, `exploit_impact`, `remotely_exploitable`), CVE correlation via `cve_likelihood`, affected scope (`endpoint_count`, `software_count`)]
 
-## AI Security & Secrets (when applicable)
-[AI risk detections by severity, exposed secrets by rule]
+## Secrets & AI Agent Activity
+[Recorded secret findings by detector type (`detector_name`); AI session counts, detection census, critical/high sessions]
 
 ## Action Items
 [Prioritized list with specific CVEs, software, endpoints to address]
@@ -153,5 +164,6 @@ Include the vulnerability delta from trends data to show if the backlog is growi
 | Count AI detection prevalence | `count_ai_session_detections` | `recency_days`, `hostname`, `agent`, `classification`, `severity`, `asset_tags`, `asset_importance`, `asset_type` |
 | Drill into AI sessions | `search_ai_sessions` | `detection_id`, `recency_days`, `hostname`, `agent`, `classification`, `severity`, `asset_tags`, `asset_importance`, `asset_type`, `limit`, `offset` |
 | Search AI security risks | `search_ai_security_risks` | `severity`, `source`, `rule_name`, `sort_by`, `limit` |
-| Search exposed secrets | `search_secrets` | `severity`, `rule_name`, `hostname`, `sort_by`, `limit` |
+| Count secret coverage | `count_secrets_by_detector` | `hostname`, `asset_id`, `asset_tags`, `asset_importance`, `asset_type` |
+| Search exposed secrets | `search_secrets` | `detector_id`, `detector_name`, `asset_id`, `hostname`, `sort_by`, `limit`, `offset` |
 | View platforms | Resource: `spektion://platforms` | N/A |

@@ -70,6 +70,16 @@ def _first(doc, key):
     return None
 
 TOOL_ENVELOPE = {
+    "count_secrets_by_detector": {"keys": ["items", "count", "findings_total",
+        "assets_with_findings", "assets_scanned_for_secrets", "assets_total",
+        "detectors_total", "truncated"]},
+    "get_ai_session_artifacts": {"keys": ["session_id", "items", "total_count",
+        "returned", "offset", "limit", "max_limit", "truncated", "artifacts_state", "data_notes"]},
+    "get_asset_executables": {"keys": ["items", "hostname", "sensor_id", "enabled",
+        "total_count", "returned", "offset", "limit"],
+        "items": ["hash", "path", "is_signed", "is_trusted", "execution_count"]},
+    "get_executable_details": {"keys": ["hash", "hash_md5", "filenames", "platform",
+        "is_signed", "is_trusted", "is_linked_to_software", "asset_count", "detection_count"]},
     "count_ai_session_detections": {"keys": ["items", "distinct_by",
         "sessions_with_detections", "sessions_total", "returned"]},
     "get_security_posture": {"keys": ["total_assets", "active_assets", "assets_by_platform",
@@ -84,10 +94,12 @@ TOOL_ENVELOPE = {
     "search_network_activity": {"keys": ["destinations", "listeners"],
                                 "items": ["destination_value", "activity_type",
                                           "connection_count"]},
-    "search_secrets": {"keys": ["items"], "items": ["event_id", "rule_name", "severity"]},
+    "search_secrets": {"keys": ["items", "total_count", "returned", "offset"],
+                       "items": ["event_id", "asset_id"]},
     "search_ai_security_risks": {"keys": ["items"], "items": ["event_id", "source",
                                                               "rule_name", "severity"]},
-    "search_executables": {"keys": ["items"], "items": ["hash", "is_signed", "asset_count"]},
+    "search_executables": {"keys": ["items", "total_count", "returned", "offset", "limit"],
+                           "items": ["hash", "is_signed", "asset_count"]},
     "search_ai_sessions": {"keys": ["items"], "items": ["session_id", "agent",
                                                         "severity_max", "asset_id", "detections"]},
     "query_sensors": {"keys": ["items", "total_count", "count", "offset", "summary"],
@@ -97,7 +109,7 @@ TOOL_ENVELOPE = {
     "get_software_details": {"keys": ["items"], "items": ["software"]},
     "get_vulnerability_details": {"keys": ["cve_id", "severity", "score", "sla_status",
                                            "impacted_software", "impacted_endpoints"]},
-    "get_detection_events": {"keys": ["items", "detection_id"],
+    "get_detection_events": {"keys": ["items", "detection_id", "total_count", "returned", "offset"],
                              "items": ["software_name", "process_path", "outputs"]},
     "get_detection_controls": {"keys": ["preventive_controls", "vendor_fix_only",
                                         "detective_control"]},
@@ -315,6 +327,13 @@ def assert_tool_result(tool_name, resp, require_schema=True):
             raise AssertionError(f"tool {tool_name}: missing envelope key '{key}'")
     if tool_name == "count_ai_session_detections":
         assert_census(doc)
+    if tool_name == "count_secrets_by_detector":
+        assert_secret_census(doc)
+    if tool_name == "get_ai_session_artifacts":
+        assert_artifacts(doc)
+    if tool_name in {"search_secrets", "search_executables", "get_asset_executables",
+                     "get_detection_events"}:
+        assert_page(doc)
     item_keys = spec.get("items") or []
     if item_keys:
         first = doc.get("items") or doc.get(ITEM_KEY.get(tool_name))
@@ -326,6 +345,73 @@ def assert_tool_result(tool_name, resp, require_schema=True):
             if key not in first:
                 raise AssertionError(f"tool {tool_name}: first item missing '{key}'")
     return doc
+
+
+def assert_page(doc):
+    for key in ("total_count", "returned", "offset"):
+        if not _type_matches(doc.get(key), "integer") or doc[key] < 0:
+            raise AssertionError(f"page: invalid {key}")
+    if not isinstance(doc.get("items"), list) or len(doc["items"]) != doc["returned"]:
+        raise AssertionError("page: returned must match items length")
+    if doc["returned"] > max(0, doc["total_count"] - doc["offset"]):
+        raise AssertionError("page: returned exceeds remaining matches")
+    if "limit" in doc and (not _type_matches(doc["limit"], "integer") or
+                           doc["limit"] <= 0 or doc["returned"] > doc["limit"]):
+        raise AssertionError("page: invalid limit")
+    if "truncated" in doc and (not isinstance(doc["truncated"], bool) or
+            doc["truncated"] != (doc["offset"] + doc["returned"] < doc["total_count"])):
+        raise AssertionError("page: truncated disagrees with total_count")
+
+
+def assert_secret_census(doc):
+    for key in ("count", "findings_total", "assets_with_findings",
+                "assets_scanned_for_secrets", "assets_total", "detectors_total"):
+        if not _type_matches(doc.get(key), "integer") or doc[key] < 0:
+            raise AssertionError(f"secret census: invalid {key}")
+    if not (doc["assets_with_findings"] <= doc["assets_scanned_for_secrets"] <= doc["assets_total"]):
+        raise AssertionError("secret census: invalid coverage denominators")
+    if not isinstance(doc.get("items"), list) or doc["count"] != len(doc["items"]):
+        raise AssertionError("secret census: count must match items length")
+    if doc["count"] > doc["detectors_total"] or not isinstance(doc.get("truncated"), bool):
+        raise AssertionError("secret census: invalid detector coverage")
+    if doc["truncated"] != (doc["count"] < doc["detectors_total"]):
+        raise AssertionError("secret census: truncated disagrees with detectors_total")
+    ids = set()
+    findings = 0
+    for row in doc["items"]:
+        for key in ("detector_id", "detector_name"):
+            if not isinstance(row.get(key), str) or not row[key]:
+                raise AssertionError(f"secret census: missing {key}")
+        if row["detector_id"] in ids:
+            raise AssertionError("secret census: duplicate detector_id")
+        ids.add(row["detector_id"])
+        for key, maximum in (("finding_count", doc["findings_total"]),
+                             ("asset_count", doc["assets_with_findings"])):
+            if not _type_matches(row.get(key), "integer") or not 0 < row[key] <= maximum:
+                raise AssertionError(f"secret census: invalid {key}")
+        if row["asset_count"] > row["finding_count"]:
+            raise AssertionError("secret census: assets exceed findings")
+        findings += row["finding_count"]
+    # Unidentified findings have no row; assets may occur in several rows.
+    if findings > doc["findings_total"]:
+        raise AssertionError("secret census: row findings exceed findings_total")
+
+
+def assert_artifacts(doc):
+    assert_page(doc)
+    states = {"artifacts_listed", "compiler_activity_without_recorded_artifacts",
+              "no_compiler_activity_recorded", "session_not_found",
+              "no_artifacts_matching_filter", "artifact_absence_unexplained"}
+    if doc.get("artifacts_state") not in states:
+        raise AssertionError("artifacts: invalid artifacts_state")
+    if (doc["total_count"] > 0) != (doc["artifacts_state"] == "artifacts_listed"):
+        raise AssertionError("artifacts: state disagrees with total_count")
+    for row in doc["items"]:
+        for key in ("hash", "name", "path"):
+            if not isinstance(row.get(key), str) or not row[key]:
+                raise AssertionError(f"artifacts: missing {key}")
+        if not isinstance(row.get("linked_to_executable"), bool):
+            raise AssertionError("artifacts: linked_to_executable must be boolean")
 
 
 def assert_census(doc):
@@ -602,86 +688,109 @@ def run_live(contract):
             "name": name, "arguments": prompt_args[name],
         }))
 
-    # Discovery order matters: run searches first so dependent tools have args.
+    # Discover identities before dependent calls. All calls are read-only and
+    # use the same population when reconciling a census with detail rows.
     discovered = {}
-    order = ["search_vulnerabilities", "search_assets", "search_software", "search_detections",
-             "count_ai_session_detections"]
+    first = ["search_vulnerabilities", "search_assets", "search_software", "search_detections",
+             "count_ai_session_detections", "count_secrets_by_detector",
+             "search_executables", "search_ai_sessions"]
+    order = first + sorted(set(contract_by_name(contract)) - set(first))
     for name in order:
-        args = {"recency_days": 30} if name == "count_ai_session_detections" else {"limit": 5}
-        resp = call("tools/call", {"name": name, "arguments": args})
-        try:
-            doc = assert_tool_result(name, resp)
-        except AssertionError as e:
-            errors.append(f"{name}: {e}")
-            continue
-        items = doc.get("items") or []
-        if items:
-            first = items[0]
-            if name == "search_assets":
-                first = next((item for item in items if item.get("secret_count", 0) > 0), first)
-            if name == "search_vulnerabilities" and "cve_id" not in discovered:
-                discovered["cve_id"] = first.get("cve_id")
-            elif name == "search_assets" and "hostname" not in discovered:
-                discovered["hostname"] = first.get("hostname")
-                discovered["asset_id"] = first.get("asset_id")
-                discovered["secret_count"] = first.get("secret_count")
-            elif name == "search_software" and "name" not in discovered:
-                discovered["software_name"] = first.get("name")
-            elif name == "search_detections" and "id" not in discovered:
-                discovered["detection_id"] = first.get("id")
-            elif name == "count_ai_session_detections":
-                discovered["ai_detection_id"] = first.get("detection_id")
-                discovered["ai_session_count"] = first.get("session_count")
-
-    args_for = {
-        "search_vulnerabilities": {"limit": 5},
-        "search_assets": {"limit": 5},
-        "search_software": {"limit": 5},
-        "search_detections": {"limit": 5},
-        "search_secrets": {"asset_id": discovered.get("asset_id") or "", "limit": 5},
-        "search_ai_security_risks": {"limit": 5},
-        "search_executables": {"limit": 5},
-        "search_ai_sessions": {"limit": 5, "recency_days": 30,
-                               "detection_id": [discovered["ai_detection_id"]]
-                               if discovered.get("ai_detection_id") else []},
-        "query_sensors": {"limit": 5},
-        "get_security_posture": {},
-        "get_remediation_metrics": {},
-        "get_vulnerability_trends": {},
-        "get_tenant_settings": {},
-        "search_network_activity": {"software_name": discovered.get("software_name") or "", "limit": 5},
-        "get_software_details": {"software_name": discovered.get("software_name") or ""},
-        "get_asset_details": {"hostname": discovered.get("hostname") or ""},
-        "get_vulnerability_details": {"cve_id": discovered.get("cve_id") or ""},
-        "get_detection_events": {"detection_id": discovered.get("detection_id") or ""},
-        "get_detection_controls": {"detection_id": discovered.get("detection_id") or ""},
-    }
-
-    for name, spec in contract_by_name(contract).items():
-        if name in order:  # already exercised above
-            continue
+        args_for = {
+            "search_vulnerabilities": {"limit": 5},
+            "search_assets": {"limit": 5},
+            "search_software": {"limit": 5},
+            "search_detections": {"limit": 5},
+            "count_ai_session_detections": {"recency_days": 30},
+            "count_secrets_by_detector": {"asset_id": discovered.get("asset_id") or ""},
+            "search_secrets": {"asset_id": discovered.get("asset_id") or "", "limit": 5},
+            "search_ai_security_risks": {"limit": 5},
+            "search_executables": {"limit": 5},
+            "search_ai_sessions": {"limit": 5, "recency_days": 30,
+                                   "detection_id": [discovered["ai_detection_id"]]
+                                   if discovered.get("ai_detection_id") else []},
+            "get_ai_session_artifacts": {"session_id": discovered.get("session_id") or "", "limit": 5},
+            "get_asset_executables": {"hostname": discovered.get("hostname") or "", "limit": 5},
+            "get_executable_details": {"hash": discovered.get("hash") or ""},
+            "query_sensors": {"limit": 5},
+            "get_security_posture": {},
+            "get_remediation_metrics": {},
+            "get_vulnerability_trends": {},
+            "get_tenant_settings": {},
+            "search_network_activity": {"software_name": discovered.get("software_name") or "", "limit": 5},
+            "get_software_details": {"software_name": discovered.get("software_name") or ""},
+            "get_asset_details": {"hostname": discovered.get("hostname") or ""},
+            "get_vulnerability_details": {"cve_id": discovered.get("cve_id") or ""},
+            "get_detection_events": {"detection_id": discovered.get("detection_id") or ""},
+            "get_detection_controls": {"detection_id": discovered.get("detection_id") or ""},
+        }
         args = args_for.get(name)
         if args is None:
             errors.append(f"{name}: no call args defined in live mode")
             continue
-        missing = [k for k, v in args.items() if not v]
+        missing = [key for key, value in args.items() if value in (None, "", [])]
         if missing:
             errors.append(f"{name}: cannot exercise - missing discovery value for {', '.join(missing)}")
             continue
         resp = call("tools/call", {"name": name, "arguments": args})
         try:
             doc = assert_tool_result(name, resp)
-            if name == "search_ai_sessions" and doc.get("total_count") != discovered["ai_session_count"]:
-                raise AssertionError("census/session total mismatch with the same 30-day window; "
-                                     "check service parity or telemetry changes between calls")
-            if name == "search_ai_sessions" and any(
-                    discovered["ai_detection_id"] not in {d.get("id") for d in row.get("detections", [])}
-                    for row in doc["items"]):
-                raise AssertionError("session drill-through returned a row without the requested detection")
-            if name == "search_secrets" and doc.get("total_count") != discovered.get("secret_count"):
-                raise AssertionError("asset secret_count differs from exact-asset findings total_count")
-            if name == "get_asset_details" and "secret_types" not in doc["endpoint"]:
-                raise AssertionError("asset secret_types unavailable; enrichment did not answer")
+            items = doc.get("items") or []
+            row = items[0] if items else {}
+            if name == "search_vulnerabilities":
+                discovered["cve_id"] = row.get("cve_id")
+            elif name == "search_assets":
+                row = next((item for item in items if item.get("secret_count", 0) > 0), row)
+                discovered.update({key: row.get(key) for key in ("hostname", "asset_id", "secret_count")})
+            elif name == "search_software":
+                discovered["software_name"] = row.get("name")
+            elif name == "search_detections":
+                discovered["detection_id"] = row.get("id")
+            elif name == "count_ai_session_detections":
+                discovered["ai_detection_id"] = row.get("detection_id")
+                discovered["ai_session_count"] = row.get("session_count")
+            elif name == "count_secrets_by_detector":
+                if doc["findings_total"] != discovered["secret_count"]:
+                    raise AssertionError("secret census differs from exact-asset secret_count")
+                if not row:
+                    raise AssertionError("seeded asset needs at least one identified secret detector")
+                discovered["secret_detector_id"] = row["detector_id"]
+                discovered["secret_finding_count"] = row["finding_count"]
+            elif name == "search_executables":
+                discovered["hash"] = row.get("hash")
+            elif name == "search_ai_sessions":
+                discovered["session_id"] = row.get("session_id")
+                if doc.get("total_count") != discovered["ai_session_count"]:
+                    raise AssertionError("census/session total mismatch with the same 30-day window; "
+                                         "check service parity or telemetry changes between calls")
+                if any(discovered["ai_detection_id"] not in {d.get("id") for d in item.get("detections", [])}
+                       for item in items):
+                    raise AssertionError("session drill-through returned a row without the requested detection")
+            elif name == "search_secrets":
+                if doc["total_count"] != discovered["secret_count"]:
+                    raise AssertionError("asset secret_count differs from exact-asset findings total_count")
+                detector = discovered.get("secret_detector_id")
+                if not detector:
+                    raise AssertionError("cannot drill through without a census detector_id")
+                detail = assert_tool_result(name, call("tools/call", {"name": name, "arguments": {
+                    **args, "detector_id": detector}}))
+                if detail["total_count"] != discovered["secret_finding_count"]:
+                    raise AssertionError("secret census/detector findings total mismatch")
+                if any(item.get("detector_id") != detector for item in detail["items"]):
+                    raise AssertionError("secret drill-through returned another detector")
+            elif name == "get_asset_details":
+                if "secret_types" not in doc["endpoint"]:
+                    raise AssertionError("asset secret_types unavailable; enrichment did not answer")
+                if doc["endpoint"]["asset_id"] != discovered["asset_id"]:
+                    raise AssertionError("asset detail resolved a different asset")
+            elif name == "get_asset_executables":
+                if (doc["hostname"].casefold() != discovered["hostname"].casefold() or
+                        doc["sensor_id"] != discovered["asset_id"]):
+                    raise AssertionError("asset executable lookup resolved a different asset")
+            elif name == "get_ai_session_artifacts" and doc["session_id"] != discovered["session_id"]:
+                raise AssertionError("artifacts returned a different session")
+            elif name == "get_executable_details" and doc["hash"] != discovered["hash"]:
+                raise AssertionError("executable detail returned a different hash")
         except AssertionError as e:
             errors.append(f"{name}: {e}")
 

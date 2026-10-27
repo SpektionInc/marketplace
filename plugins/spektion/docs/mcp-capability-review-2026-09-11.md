@@ -1,5 +1,7 @@
 # MCP capability review — September 11, 2026
 
+> Historical source snapshot. See the [October 27 review](mcp-capability-review-2026-10-27.md) for the current PR contract and release requirements.
+
 ## Sources and release target
 
 Reviewed API master `b9c71bc191bfecd782a9895ed872e3c1b0ecc9e3` against

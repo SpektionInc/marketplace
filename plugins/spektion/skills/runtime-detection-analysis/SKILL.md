@@ -20,7 +20,7 @@ You are a vulnerability analyst investigating runtime behavioral detections usin
 Spektion detections are **runtime behavioral observations** — distinct from CVEs. They come from Spektion sensors monitoring software behavior on endpoints. Key concepts:
 
 - **Categories:** `"runtime_weakness"` (insecure configs), `"exploit_impact"` (exploitation indicators), `"remotely_exploitable"` (network-accessible attack vectors)
-- **Impact levels:** `highest_impact` values are lowercase: critical, high, medium, low
+- **Impact levels:** filter `highest_impact` with critical, high, medium, low, or informational; normalize returned capitalization when comparing
 - **CVE likelihood:** `cve_likelihood.probability` is a string (`"high"`, `"medium"`, or `"low"`) with a `description` explaining how the detection correlates with known CVE exploitation patterns
 - **Affected scope:** each detection result carries `endpoint_count`, `software_count`, and `elevated_software_count`
 
@@ -29,7 +29,7 @@ Spektion detections are **runtime behavioral observations** — distinct from CV
 ### Step 1: Discover Active Detections
 
 Call `search_detections` to find current behavioral detections:
-- `highest_impact: critical` — start with the most severe detections
+- `sort_by: endpoint_count` — start with the most widespread detections, then triage by the `highest_impact` field on the returned rows (critical/high first)
 - `platform`: filter to a specific OS if needed
 - `category`: filter by detection type (`runtime_weakness`, `exploit_impact`, `remotely_exploitable`)
 - `sort_by`: `highest_impact`, `endpoint_count`, `software_count`, `first_seen`, or `last_seen`
@@ -37,11 +37,19 @@ Call `search_detections` to find current behavioral detections:
 
 Each result includes `id`, `name`, `description`, `highest_impact`, `category`, `subcategory`, `platform`, `endpoint_count`, `software_count`, `elevated_software_count`, `cve_likelihood`, `first_seen`, and `detail_url`. Keep the `id` — you will need it for evidence and controls.
 
-### Step 2: Pull Evidence Events
+Current API builds apply `highest_impact` to the returned impact and count after filtering; for critical or high, make one call per level. For deployments without the ENG-3614 fix, page by `endpoint_count` and triage returned impact client-side. Schema presence alone does not prove that older filter bug is fixed.
 
-For each significant detection, call `get_detection_events` with its `detection_id` (the `id` from `search_detections`; `name` is accepted only when the id is unknown and may return a `candidates` list to disambiguate). The response lists, per affected software product: `software_id`, `software_name`, `first_seen` (event time), `process_path`, `module_name`, `api_function_name` (when present), and `outputs` (the matched evidence parameters).
+### Step 2: Pull Evidence Summaries
 
-Use this to answer "show the evidence / events / logs" for a runtime weakness. Never route runtime-weakness evidence requests to `search_ai_security_risks` (that covers the separate AI-security surface).
+For evidence behind a specific runtime detection, call `get_detection_events` with its `detection_id` (or resolve by `name`). Results are software-product groups, not individual events; `total_count` includes one unattributed group when present.
+
+**Server compatibility:** Paging and the new response fields require a deployed API build containing [spektionapi#373](https://github.com/SpektionInc/spektionapi/pull/373); deterministic ordering of tied groups requires [spektion-analytics#264](https://github.com/SpektionInc/spektion-analytics/pull/264). Before paging, verify that the exposed tool schema declares `offset` and the first response echoes it. If either check fails or cannot be verified, stop after the first page and report that complete enumeration is unavailable. Do not send offsets to an older server: it can ignore them and repeat the first page. On older builds, a zero-UUID `software_id` still represents the combined unattributed group even without `unattributed=true`.
+
+Page only as far as needed with `limit` (default 20, max 100) and `offset` (default 0, max 4294967295). After a nonempty page, advance offset by the limit used until `offset + returned` reaches `total_count`; `truncated=true` means groups remain. Stop advancing on any empty page and read `message` if present: a failed count probe means zero is unknown; a page/count disagreement means live data may have shifted, so restart at offset 0 only if enumeration is still needed. An empty page with `total_count=0` and no message means no groups were found. Each page recomputes the detection's history, so avoid exhaustive walks unless the question needs them.
+
+`unattributed=true` combines executables not linked to a product, has no `software_id`, and must not be presented as one program. Payload fields summarize latest evidence, while `first_seen` is the earliest group observation; equal latest timestamps can mix fields from different events. Live updates can repeat or skip groups across pages, so a walk is not a snapshot. These rows do not establish raw event frequency, executable counts, or which asset triggered an event.
+
+Use `detection_id` from discovery. A name lookup can return `candidates`; disambiguate before interpreting evidence. Runtime-weakness evidence belongs here, not to the separate AI-security finding tool.
 
 ### Step 3: Analyze Possible CVE Context
 
@@ -59,17 +67,23 @@ This is a heuristic comparison, not an exact join: neither `search_detections` n
 
 ### Step 4: Identify Affected Software
 
-Take affected software names from `get_detection_events.items[].software_name`; `search_detections.software_count` is only a count and cannot identify products. To assess deployment breadth and business impact:
-- Call `search_software` for the associated software names to see `endpoint_count`, `cve_count`, `detection_count`, and risk flags (`has_high_risks`, `has_runtime_weakness`, `has_remote_exploitability`)
-- Call `get_software_details` for a specific product to see which endpoints have it installed
+Take product identities from `get_detection_events.items[].software_name`, excluding the combined unattributed group. A detection's own name and platform do not identify a software product.
+
+For available mitigations and compensating controls, call `get_detection_controls` with the same `detection_id`.
+
+To assess the deployment scope of the affected software, call `search_software` or `get_software_details` to understand:
+- Deployment breadth (how many endpoints)
+- Business impact tiers of affected endpoints
+- Whether the software also has known CVEs
+- Risk flags (has_high_risks, has_remote_exploitability)
 
 > **Note:** `get_software_details` groups results by platform. Access software metadata via `items[].software` and per-endpoint data via `items[].assets[]`.
 
+Under an asset scope, discovery counts narrow to the requested assets but evidence summaries remain fleet-wide. Do not label those summaries as scoped observations.
+
 ### Step 5: Map Endpoint Impact
 
-`search_detections.endpoint_count` gives the affected count but not endpoint identities. `search_assets` has no detection filter and is capped at 100 with no offset, so never treat high-risk assets on the same platform as affected by this detection.
-
-For bounded corroboration, call `search_assets` for the platform and treat an individual asset as detection-affected only when its `risks[]` contains the exact `risk_id`/detection ID under investigation. State that the result is incomplete whenever the asset search is truncated or the fleet can exceed the returned window. Call `get_asset_details` only for an exact hostname already corroborated this way. If exhaustive endpoint identities are requested, report that the current MCP surface provides the count but cannot enumerate the full set.
+Each `search_detections` row carries the affected asset count. To find the highest-risk assets on the affected platform, use `search_assets` sorted by `detection_count` or `cve_count`; each returned asset includes a `risks` array (risk_id, risk_name, category). Read that array as **risks associated with the asset's installed software**, not as observed behavior: an asset inherits a detection when any asset shares the same canonical software, even if it never triggered the detection itself. Do not claim a specific asset exhibited the behavior — `get_detection_events` evidence is per-software and fleet-wide, so asset-level observation is not available from this surface; attribute behavior to the software, and to assets only as "at risk via installed software". For critical assets, call `get_asset_details` with the exact hostname to understand the full risk context.
 
 ### Step 6: Obtain Hardening and Monitoring Guidance
 
@@ -92,7 +106,7 @@ Synthesize findings into an actionable narrative:
 1. **Detection summary** — what behaviors were observed, how severe, how widespread (`endpoint_count`, `software_count`)
 2. **Evidence** — what the event logs show (process paths, modules, API functions, matched outputs)
 3. **Possible CVE context** — clearly labeled hypotheses based on rule-level likelihood and product/platform overlap; never an asserted CVE-event mapping without direct evidence
-4. **Affected scope** — exact counts from `search_detections`; software identities from evidence; only individually corroborated endpoint identities, with bounded-search limitations disclosed
+4. **Affected scope** — counts from discovery and software identities from evidence; describe asset risks as inherited through installed software unless separate evidence confirms behavior on that asset. Asset search supports paging but has no detection-ID filter; match the requested risk ID only to identify assets at risk via installed software, and preserve the paging and completeness limits in the asset workflow.
 5. **Network exposure** — are affected systems network-accessible or making suspicious connections
 6. **Controls** — Spektion's own preventive/detective controls for the weakness (from `get_detection_controls`)
 7. **Risk assessment** — distinguish verified behavior, inferred possibilities, and unknowns; do not label activity as exploitation without direct evidence
@@ -110,11 +124,11 @@ If not available, proceed with Spektion data only. All enrichment is additive, n
 
 | Action | MCP Tool | Key Parameters |
 |--------|----------|----------------|
-| Search detections | `search_detections` | `category`, `highest_impact`, `platform`, `sort_by`, `limit`, `offset` |
-| Get detection evidence | `get_detection_events` | `detection_id` (preferred) or `name`, `limit` |
-| Search matching CVEs | `search_vulnerabilities` | `severity`, `platform`, `has_remote_exploitability`, `sort_by`, `limit`, `offset` |
+| Search detections | `search_detections` | `name`, `category`, `platform`, `sort_by`, `limit`, `offset` |
+| Detection evidence summaries | `get_detection_events` | `detection_id` (preferred) or `name`, `limit` (max 100), `offset` (max 4294967295) |
+| Get mitigations/controls | `get_detection_controls` | `detection_id` (required) |
+| Search matching CVEs | `search_vulnerabilities` | `severity`, `has_remote_exploitability`, `sort_by`, `limit` |
 | Get software details | `get_software_details` | `software_name` (required) |
 | Map endpoint impact | `search_assets` | `platform`, `sort_by` (exposure_score, cve_count), `limit` |
 | Get asset details | `get_asset_details` | `hostname` (required, exact) |
-| Get controls for a weakness | `get_detection_controls` | `detection_id` (required) |
 | Check network activity | `search_network_activity` | `software_name` (required), `limit` |

@@ -80,7 +80,7 @@ class ValidationRegressionTests(unittest.TestCase):
             smoke.assert_census({"items": [], "distinct_by": "session", "returned": 0,
                                  "sessions_total": total, "sessions_with_detections": 0})
 
-    def fake_live(self, mismatch=False):
+    def fake_live(self, mismatch=False, secret_mismatch=False):
         calls = []
 
         def post(_url, headers, request, expect_response=True):
@@ -97,6 +97,10 @@ class ValidationRegressionTests(unittest.TestCase):
                 calls.append(request["params"])
                 response = self.fixture("call_" + name)["response"]
                 if mismatch and name == "search_ai_sessions":
+                    doc = json.loads(response["result"]["content"][0]["text"])
+                    doc["total_count"] += 1
+                    response["result"]["content"][0]["text"] = json.dumps(doc)
+                if secret_mismatch and name == "search_secrets" and "detector_id" in request["params"]["arguments"]:
                     doc = json.loads(response["result"]["content"][0]["text"])
                     doc["total_count"] += 1
                     response["result"]["content"][0]["text"] = json.dumps(doc)
@@ -125,6 +129,14 @@ class ValidationRegressionTests(unittest.TestCase):
         self.assertEqual(by_name["search_ai_sessions"]["recency_days"],
                          by_name["count_ai_session_detections"]["recency_days"])
         self.assertEqual(by_name["get_tenant_settings"], {})
+        self.assertEqual(by_name["search_secrets"]["detector_id"], "SEC-JWT-001")
+        self.assertEqual(by_name["count_secrets_by_detector"]["asset_id"],
+                         by_name["search_secrets"]["asset_id"])
+        self.assertEqual(by_name["get_ai_session_artifacts"]["session_id"],
+                         "11111111-1111-4111-8111-111111111111")
+        expected_hash = json.loads(self.fixture("call_search_executables")
+                                  ["response"]["result"]["content"][0]["text"])["items"][0]["hash"]
+        self.assertEqual(by_name["get_executable_details"]["hash"], expected_hash)
 
     def test_live_fails_on_census_drill_through_count_mismatch(self):
         (code, errors), _ = self.fake_live(mismatch=True)
@@ -139,7 +151,7 @@ class ValidationRegressionTests(unittest.TestCase):
             skill_dir = root / "skills" / "example"
             skill_dir.mkdir(parents=True)
             (skill_dir / "SKILL.md").write_text(
-                "Call `search_assets` with `is_online: maybe` and `offset: 3`.\n")
+                "Call `search_assets` with `is_online: maybe` and `hash: invented`.\n")
             old_root, old_skills = parity.REPO_ROOT, parity.SKILLS_DIR
             try:
                 parity.REPO_ROOT = root
@@ -149,6 +161,67 @@ class ValidationRegressionTests(unittest.TestCase):
                 parity.REPO_ROOT, parity.SKILLS_DIR = old_root, old_skills
         self.assertTrue(any("invalid literal" in error for error in errors), errors)
         self.assertTrue(any("unknown parameter" in error for error in errors), errors)
+
+    def test_secret_census_allows_unidentified_findings_and_overlapping_assets(self):
+        doc = json.loads(self.fixture("call_count_secrets_by_detector")
+                         ["response"]["result"]["content"][0]["text"])
+        doc["findings_total"] = 4
+        doc["items"].append({"detector_id": "SEC-OTHER", "detector_name": "Other",
+                             "finding_count": 1, "asset_count": 1})
+        doc["count"] = doc["detectors_total"] = 2
+        smoke.assert_secret_census(doc)
+        for key, value in (("assets_scanned_for_secrets", 0), ("count", 99),
+                           ("findings_total", 2), ("truncated", True)):
+            with self.subTest(key=key):
+                invalid = copy.deepcopy(doc)
+                invalid[key] = value
+                with self.assertRaises(AssertionError):
+                    smoke.assert_secret_census(invalid)
+
+    def test_live_fails_on_secret_detector_count_mismatch(self):
+        (code, errors), _ = self.fake_live(secret_mismatch=True)
+        self.assertEqual(code, 1)
+        self.assertTrue(any("secret census/detector findings total mismatch" in e for e in errors), errors)
+
+    def test_artifact_absence_states_and_paging_are_validated(self):
+        doc = json.loads(self.fixture("call_get_ai_session_artifacts")
+                         ["response"]["result"]["content"][0]["text"])
+        invalid = copy.deepcopy(doc)
+        invalid["items"][0]["linked_to_executable"] = "false"
+        with self.assertRaisesRegex(AssertionError, "linked_to_executable"):
+            smoke.assert_artifacts(invalid)
+        invalid = copy.deepcopy(doc)
+        invalid["truncated"] = True
+        with self.assertRaisesRegex(AssertionError, "truncated"):
+            smoke.assert_artifacts(invalid)
+        doc.update(items=[], total_count=0, returned=0,
+                   artifacts_state="compiler_activity_without_recorded_artifacts")
+        smoke.assert_artifacts(doc)
+        doc["artifacts_state"] = "artifacts_listed"
+        with self.assertRaisesRegex(AssertionError, "state disagrees"):
+            smoke.assert_artifacts(doc)
+
+    def test_current_secret_arguments_reject_obsolete_severity(self):
+        fx = self.fixture("call_search_secrets")
+        fx["request"]["params"]["arguments"].update(detector_id="SEC-JWT-001", offset=1)
+        smoke.assert_tool_call_request(smoke.load_contract(), fx)
+        fx["request"]["params"]["arguments"]["severity"] = "high"
+        with self.assertRaisesRegex(AssertionError, "unknown arguments"):
+            smoke.assert_tool_call_request(smoke.load_contract(), fx)
+
+    def test_scope_operator_casing_matches_wire_enum(self):
+        spec = parity.tools_by_name(parity.load_contract())["search_assets"]
+        allowed = parity.enum_for(spec, "asset_tags_op")
+        self.assertIn(parity.normalize('"notEqual"'), allowed)
+        self.assertNotIn(parity.normalize('"notequal"'), allowed)
+
+    def test_secret_findings_can_have_incomplete_detector_identity(self):
+        response = self.fixture("call_search_secrets")["response"]
+        doc = json.loads(response["result"]["content"][0]["text"])
+        del doc["items"][0]["detector_id"]
+        del doc["items"][0]["detector_name"]
+        response["result"]["content"][0]["text"] = json.dumps(doc)
+        smoke.assert_tool_result("search_secrets", response)
 
     def test_fixture_suite_fails_when_tool_calls_are_removed(self):
         source = REPO_ROOT / "plugins" / "spektion" / "scripts" / "fixtures"

@@ -151,7 +151,8 @@ def scan_tool_references(text, path, mcp_tools, errors):
 
 
 def normalize(value):
-    return (value.strip().strip("`'\",.:;()[]").lower())
+    # Wire enums are case-sensitive (notably the scope operator notEqual).
+    return value.strip().strip("`'\",.:;()[]")
 
 
 def validate_skill_params(contract, mcp_tools, errors):
